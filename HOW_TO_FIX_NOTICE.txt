@@ -1,0 +1,13 @@
+/*
+|---------------------------------------------------------------
+| ENVIRONMENT SETUP - สร้างไฟล์นี้ไว้ที่ root ถ้ายังไม่มี
+| วางไว้ที่: C:\xampp\htdocs\service_management\index.php
+| (ถ้ามีอยู่แล้วจาก CI3 ให้แก้แค่ ENVIRONMENT เป็น 'production')
+|---------------------------------------------------------------
+
+แก้ไขไฟล์ index.php ของ CodeIgniter 3 บรรทัดนี้:
+
+define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'production');
+
+เปลี่ยนจาก 'development' เป็น 'production'
+*/
