@@ -361,24 +361,48 @@ function showEventDetail(event) {
     : '-';
 
   $('#event-detail-body').html(
-    '<div class="row g-2">'
-    + row('เลขที่บิล',      p.bill_no)
-    + row('ประเภทงาน',      p.job_type || '-')
-    + row('สถานะ',          '<span class="badge" style="background:' + color + '">' + (p.status || '-') + '</span>')
-    + row('ชื่อลูกค้า',    p.customer_name)
-    + row('เบอร์ลูกค้า',   p.phone || '-')
-    + row('วันที่นัด',     p.install_date || '-')
-    + row('เวลา',           p.install_time ? p.install_time.substr(0,5) : '-')
-    + row('ช่าง',           p.technician)
-    + row('เบอร์ช่าง',     techPhone)
-    + row('ค่าจ้างช่าง',   wageHtml)
-    + row('หมายเหตุช่าง',  p.tech_note || '-')
-    + row('สินค้า/บริการ', p.product_service)
+    // ── แถบสถานะ top ──
+    '<div class="d-flex align-items-center gap-2 mb-3 p-2 rounded" style="background:#f8fafc;border:1px solid #e2e8f0">'
+    + '<span class="badge fs-6 px-3 py-2" style="background:' + color + '">' + (p.status || '-') + '</span>'
+    + '<span class="fw-bold fs-5">' + (p.bill_no || '-') + '</span>'
+    + (p.job_type ? '<span class="badge bg-secondary">' + p.job_type + '</span>' : '')
     + '</div>'
+
+    // ── ข้อมูลลูกค้า ──
+    + '<div class="mb-3">'
+    + '<div class="small fw-bold text-uppercase text-muted mb-2" style="letter-spacing:.05em"><i class="bi bi-person me-1"></i>ข้อมูลลูกค้า</div>'
+    + '<div class="row g-2">'
+    + row3('ชื่อลูกค้า',    p.customer_name)
+    + row3('เบอร์ลูกค้า',  p.phone || '-')
+    + row3('สินค้า/บริการ', p.product_service)
+    + '</div></div>'
+
+    // ── ข้อมูลนัดหมาย ──
+    + '<div class="mb-3">'
+    + '<div class="small fw-bold text-uppercase text-muted mb-2" style="letter-spacing:.05em"><i class="bi bi-calendar-event me-1"></i>นัดหมาย</div>'
+    + '<div class="row g-2">'
+    + row3('วันที่นัด',   p.install_date || '-')
+    + row3('เวลา',        p.install_time ? p.install_time.substr(0,5) : '-')
+    + row3('ประเภทงาน',  p.job_type || '-')
+    + '</div></div>'
+
+    // ── ข้อมูลช่าง ──
+    + '<div class="mb-1">'
+    + '<div class="small fw-bold text-uppercase text-muted mb-2" style="letter-spacing:.05em"><i class="bi bi-tools me-1"></i>ช่าง</div>'
+    + '<div class="row g-2">'
+    + row3('ชื่อช่าง',      p.technician || '-')
+    + row3('เบอร์ช่าง',     techPhone)
+    + row3('ค่าจ้างช่าง',  wageHtml)
+    + (p.tech_note ? '<div class="col-12"><div class="small text-muted">หมายเหตุช่าง</div><div class="fw-medium" style="font-size:.85rem">' + p.tech_note + '</div></div>' : '')
+    + '</div></div>'
   );
   getEventModal().show();
 }
 
+function row3(label, val) {
+  return '<div class="col-12 col-sm-4"><div class="small text-muted">' + label + '</div>'
+       + '<div class="fw-medium" style="font-size:.85rem">' + (val || '-') + '</div></div>';
+}
 function row(label, val) {
   return '<div class="col-6"><div class="small text-muted">' + label + '</div>'
        + '<div class="fw-medium" style="font-size:.85rem">' + (val || '-') + '</div></div>';

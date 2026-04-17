@@ -306,7 +306,7 @@
 <!-- Event Detail Modal                              -->
 <!-- ════════════════════════════════════════════════ -->
 <div class="modal fade" id="eventModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-scrollable">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header py-2">
         <h5 class="modal-title fw-bold">
