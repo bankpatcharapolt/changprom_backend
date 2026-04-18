@@ -120,6 +120,14 @@
 .job-result-item.selected { background:#eff6ff; border-left:3px solid #3b82f6; }
 .tech-suggest-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #f0f0f0; font-size:.83rem; }
 .tech-suggest-item:hover { background:#f0f6ff; }
+
+/* ─── Disabled job item (มีช่างแล้ว) ────────────── */
+.job-result-disabled {
+  padding:8px 12px; border-bottom:1px solid #f0f0f0;
+  background:#fafafa; cursor:not-allowed;
+  opacity:.75; pointer-events:none;
+  user-select:none;
+}
 </style>
 
 <!-- ── Page Header ─────────────────────────────────── -->

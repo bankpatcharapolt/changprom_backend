@@ -167,9 +167,14 @@ public function check_duplicate_assign($technician, $install_date, $install_time
             $this->db->group_end();
         }
       
-        return $this->db->select('id, bill_no, customer_name, phone, product_service,
+        $rows = $this->db->select('id, bill_no, customer_name, phone, product_service,
                                   install_date, install_time, technician, status, job_type')
             ->limit(20)->get($this->table)->result_array();
+
+        foreach ($rows as &$row) {
+            $row['has_technician'] = !empty(trim($row['technician'] ?? ''));
+        }
+        return $rows;
     }
 
    public function get_technicians() {

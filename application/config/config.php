@@ -1,6 +1,6 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
-
+date_default_timezone_set('Asia/Bangkok');
 $config['base_url'] = 'http://localhost/service_management/';
 $config['index_page'] = '';
 $config['uri_protocol'] = 'REQUEST_URI';

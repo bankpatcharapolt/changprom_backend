@@ -183,21 +183,40 @@ window.searchJobs = function() {
     }
     var html = '';
     r.data.forEach(function(j) {
-      html += '<div class="job-result-item"'
-        + ' onclick="window.selectJob('
-        + j.id
-        + ',\'' + esc(j.bill_no) + '\''
-        + ',\'' + esc(j.customer_name) + '\''
-        + ',\'' + (j.install_date || '') + '\''
-        + ',\'' + (j.install_time ? j.install_time.substr(0,5) : '') + '\''
-        + ',\'' + esc(j.technician) + '\''
-        + ',\'' + esc(j.job_type) + '\''
-        + ')">'
-        + '<div class="fw-medium small">' + (j.bill_no || '#' + j.id) + ' — ' + (j.customer_name || '-') + '</div>'
-        + '<div class="text-muted" style="font-size:.75rem">'
-        + (j.job_type ? '<span class="badge bg-secondary me-1">' + j.job_type + '</span>' : '')
-        + (j.product_service || '') + ' | ' + (j.phone || '') + ' | ช่าง: ' + (j.technician || '-')
-        + '</div></div>';
+      var disabled = j.has_technician;
+      if (disabled) {
+        // รายการที่มีช่างแล้ว — disable ไม่ให้คลิก
+        html += '<div class="job-result-item job-result-disabled">'
+          + '<div class="d-flex justify-content-between align-items-start">'
+          + '<div>'
+          + '<div class="fw-medium small text-muted">' + (j.bill_no || '#' + j.id) + ' — ' + (j.customer_name || '-') + '</div>'
+          + '<div style="font-size:.75rem;color:#9ca3af">'
+          + (j.job_type ? '<span class="badge bg-secondary me-1 opacity-50">' + j.job_type + '</span>' : '')
+          + (j.product_service || '') + ' | ' + (j.phone || '')
+          + '</div>'
+          + '</div>'
+          + '<span class="badge ms-2 flex-shrink-0" style="background:#f3f4f6;color:#6b7280;font-size:.7rem;white-space:nowrap">'
+          + '<i class="bi bi-person-check me-1"></i>มีช่างแล้ว: ' + j.technician
+          + '</span>'
+          + '</div></div>';
+      } else {
+        // รายการปกติ — คลิกได้
+        html += '<div class="job-result-item"'
+          + ' onclick="window.selectJob('
+          + j.id
+          + ',\'' + esc(j.bill_no) + '\''
+          + ',\'' + esc(j.customer_name) + '\''
+          + ',\'' + (j.install_date || '') + '\''
+          + ',\'' + (j.install_time ? j.install_time.substr(0,5) : '') + '\''
+          + ',\'' + esc(j.technician) + '\''
+          + ',\'' + esc(j.job_type) + '\''
+          + ')">'
+          + '<div class="fw-medium small">' + (j.bill_no || '#' + j.id) + ' — ' + (j.customer_name || '-') + '</div>'
+          + '<div class="text-muted" style="font-size:.75rem">'
+          + (j.job_type ? '<span class="badge bg-secondary me-1">' + j.job_type + '</span>' : '')
+          + (j.product_service || '') + ' | ' + (j.phone || '') + ' | ช่าง: ' + (j.technician || '-')
+          + '</div></div>';
+      }
     });
     $('#job-results').html(html);
   });
