@@ -58,6 +58,48 @@ if (d.location) {
 var loc = mapsUrl
   ? '<a href="' + mapsUrl + '" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-geo-alt me-1"></i>เปิด Maps</a>'
   : '-';
+    // ── สร้าง checkin section ──────────────────────────────
+    var checkinHtml = '';
+    if (d.checkins && d.checkins.length > 0) {
+      checkinHtml += '<hr class="my-3">'
+        + '<div class="d-flex align-items-center gap-2 mb-2">'
+        + '<i class="bi bi-pin-map-fill text-success"></i>'
+        + '<span class="fw-bold">ตำแหน่งที่ช่างบันทึกการเข้างาน</span>'
+        + '<span class="badge bg-success">' + d.checkins.length + ' รายการ</span>'
+        + '</div>';
+
+      d.checkins.forEach(function(c, i) {
+        var mapsUrl = (c.start_lat && c.start_lng)
+          ? 'https://www.google.com/maps?q=' + c.start_lat + ',' + c.start_lng
+          : null;
+        var startTime = c.start_time ? c.start_time.substr(0,16).replace('T',' ') : '-';
+
+        checkinHtml += '<div class="border rounded p-3 mb-2" style="background:#f0fdf4;border-color:#bbf7d0!important">'
+          + '<div class="d-flex align-items-center gap-2 mb-2">'
+          + '<i class="bi bi-clock-history text-success"></i>'
+          + '<span class="fw-bold small text-success">บันทึกเข้างาน</span>'
+          + '<span class="ms-auto text-dark fw-medium small">' + startTime + '</span>'
+          + '</div>'
+          + (c.start_address
+              ? '<div class="d-flex align-items-start gap-2 mb-2">'
+                + '<i class="bi bi-geo-alt-fill text-danger mt-1" style="font-size:.85rem"></i>'
+                + '<span class="small text-dark">' + c.start_address + '</span>'
+                + '</div>'
+              : '')
+          + (mapsUrl
+              ? '<a href="' + mapsUrl + '" target="_blank" class="btn btn-sm btn-outline-success" style="font-size:.78rem">'
+                + '<i class="bi bi-map me-1"></i>เปิดแผนที่</a>'
+              : '<span class="small text-muted">ไม่มีข้อมูลพิกัด</span>')
+          + '</div>';
+      });
+    } else {
+      checkinHtml = '<hr class="my-3">'
+        + '<div class="d-flex align-items-center gap-2 text-muted">'
+        + '<i class="bi bi-pin-map"></i>'
+        + '<span class="small">ยังไม่มีการบันทึกตำแหน่งเข้างาน</span>'
+        + '</div>';
+    }
+
     $('#viewBody').html(
       '<div class="row g-3">'
       + col(4, 'ประเภทงาน',     d.job_type)
@@ -79,6 +121,7 @@ var loc = mapsUrl
       + col(6, 'หมายเหตุช่าง', '<span style="white-space:pre-wrap">' + esc(d.tech_note) + '</span>')
       + col(6, 'หมายเหตุบิล',  '<span style="white-space:pre-wrap">' + esc(d.bill_note) + '</span>')
       + '</div>'
+      + checkinHtml
     );
     new bootstrap.Modal(document.getElementById('viewModal')).show();
   });

@@ -32,6 +32,7 @@ class Api extends CI_Controller {
         $this->_check_auth();
         $data = $this->Service_model->get_by_id($id);
         if (!$data) { $this->_response(['success'=>false,'message'=>'ไม่พบข้อมูล'],404); return; }
+        $data['checkins'] = $this->Service_model->get_checkins_by_job($id);
         $this->_response(['success'=>true,'data'=>$data]);
     }
 

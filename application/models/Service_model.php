@@ -24,6 +24,25 @@ class Service_model extends CI_Model {
         return $this->db->where('id',$id)->get($this->table)->row_array();
     }
 
+    public function get_checkins_by_job($job_id) {
+        // checkin columns อยู่ใน service_jobs ตารางเดียวกัน
+        // ดึงเฉพาะคอลัมน์ checkin ที่มีอยู่จริง (ป้องกัน error ถ้าบาง column ยังไม่มี)
+        $available = $this->db->list_fields($this->table);
+        $want = ['start_lat','start_lng','start_time','start_address',
+                 'end_lat','end_lng','end_time','end_address'];
+        $cols = array_intersect($want, $available);
+        if (empty($cols)) return [];
+
+        $row = $this->db->select(implode(', ', $cols))
+            ->where('id', $job_id)
+            ->get($this->table)->row_array();
+
+        if (!$row) return [];
+        // ถ้ายังไม่เคย checkin เลย (start_time เป็น null) return array ว่าง
+        if (empty($row['start_time'])) return [];
+        return [$row];
+    }
+
     public function get_by_bill($bill_no) {
         return $this->db->where('bill_no',$bill_no)->get($this->table)->row_array();
     }

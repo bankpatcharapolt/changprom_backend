@@ -54,11 +54,13 @@ var ASSET = '<?= base_url() ?>';
             <i class="bi bi-list-ul me-1"></i>รายการงาน
           </a>
         </li>
+        <?php if ($this->session->userdata('role') === 'superadmin'): ?>
         <li class="nav-item">
           <a class="nav-link <?= strpos(uri_string(),'import')!==false?'active':'' ?>" href="<?= site_url('service/import') ?>">
             <i class="bi bi-file-earmark-excel me-1"></i>นำเข้า Excel
           </a>
         </li>
+        <?php endif; ?>
      
       </ul>
       <div class="d-flex align-items-center gap-3">

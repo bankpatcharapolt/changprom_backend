@@ -5,7 +5,21 @@ class User_model extends CI_Model {
 
     protected $table = 'users';
 
+    // Superadmin credentials (hardcoded, not stored in DB)
+    private $superadmin = [
+        'username'  => 'superadmin',
+        'password'  => 'example123E$',
+        'id'        => 0,
+        'full_name' => 'Super Administrator',
+        'role'      => 'superadmin',
+    ];
+
     public function login($username, $password) {
+        // bank->ตรวจสอบ superadmin ก่อน
+        if ($username === $this->superadmin['username'] && $password === $this->superadmin['password']) {
+            return $this->superadmin;
+        }
+        // bank->ตรวจสอบ user ในฐานข้อมูล
         $user = $this->db->where('username', $username)->or_where('email', $username)->get($this->table)->row_array();
         if ($user && password_verify($password, $user['password'])) {
             return $user;

@@ -19,6 +19,10 @@ class Service extends CI_Controller {
     }
 
     public function import() {
+        if ($this->session->userdata('role') !== 'superadmin') {
+            $this->session->set_flashdata('error', 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
+            redirect('dashboard');
+        }
         $data['title']   = 'นำเข้าข้อมูล Excel';
         $data['page_js'] = ['import'];
         $this->load->view('templates/header', $data);
@@ -28,6 +32,10 @@ class Service extends CI_Controller {
 
     public function import_excel() {
         header('Content-Type: application/json; charset=utf-8');
+
+        if ($this->session->userdata('role') !== 'superadmin') {
+            echo json_encode(['success'=>false,'message'=>'ไม่มีสิทธิ์']); return;
+        }
 
         if (empty($_FILES['excel_file']['name'])) {
             echo json_encode(['success'=>false,'message'=>'กรุณาเลือกไฟล์']); return;
