@@ -18,25 +18,45 @@
     <div class="card-body">
       <div class="row g-2 small">
         <div class="col-md-6">
-          <div class="fw-medium text-primary mb-1">ข้อมูลที่ดึงจากไฟล์อัตโนมัติ</div>
-          <ul class="mb-0 ps-3">
-            <li>เลขที่บิล (คอลัมน์ B)</li>
-            <li>ชื่อลูกค้า (คอลัมน์ I)</li>
-            <li>วันที่ออก (คอลัมน์ C) → วันที่ซื้อ</li>
-            <li>ชื่อสินค้า/บริการ (คอลัมน์ N)</li>
-            <li>ยอดรวม (คอลัมน์ AE) และแท็ก (คอลัมน์ AJ)</li>
-          </ul>
+          <div class="fw-medium text-primary mb-2">ข้อมูลที่ดึงจากไฟล์อัตโนมัติ</div>
+          <table class="table table-sm table-borderless mb-0" style="font-size:.8rem">
+            <tbody>
+              <tr><td class="text-muted pe-2" style="width:110px">คอลัมน์ B</td><td>เลขที่บิล</td></tr>
+              <tr><td class="text-muted pe-2">คอลัมน์ C</td><td>วันที่ออก → วันที่ซื้อ</td></tr>
+              <tr><td class="text-muted pe-2">คอลัมน์ G</td><td>ชื่อลูกค้า</td></tr>
+              <tr><td class="text-muted pe-2">คอลัมน์ J</td><td>ชื่อสินค้า/บริการ</td></tr>
+              <tr><td class="text-muted pe-2">คอลัมน์ P</td><td>ยอดรวม (บาท)</td></tr>
+              <tr><td class="text-muted pe-2">คอลัมน์ U</td><td>แท็ก</td></tr>
+            </tbody>
+          </table>
         </div>
         <div class="col-md-6">
-          <div class="fw-medium text-success mb-1">ดึงจากช่อง "หมายเหตุ" อัตโนมัติ</div>
-          <ul class="mb-0 ps-3">
-            <li>เบอร์โทรพนักงาน / รหัสพนักงานขาย</li>
-            <li>ทีม / สาขา</li>
-          </ul>
-          <div class="mt-2 text-warning fw-medium small">
-            <i class="bi bi-exclamation-triangle me-1"></i>ต้องกรอก ช่าง / วันนัด / ประเภทงาน ภายหลัง
+          <div class="fw-medium text-success mb-2">ดึงจากคอลัมน์ S "หมายเหตุ" อัตโนมัติ</div>
+          <table class="table table-sm table-borderless mb-0" style="font-size:.8rem">
+            <tbody>
+              <tr><td class="text-muted pe-2" style="width:110px">เบอร์โทร</td><td>จากบรรทัดที่มีเบอร์โทร 10 หลัก</td></tr>
+              <tr><td class="text-muted pe-2">รหัสพนักงาน</td><td>รหัสพนักงานขาย (SL...)</td></tr>
+              <tr><td class="text-muted pe-2">ทีม</td><td>ทีม : ...</td></tr>
+              <tr><td class="text-muted pe-2">สาขา</td><td>สาขา : ...</td></tr>
+            </tbody>
+          </table>
+          <div class="mt-2 p-2 rounded" style="background:#fff8e1;font-size:.78rem">
+            <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+            <span class="text-warning fw-medium">ต้องกรอกภายหลัง:</span>
+            ช่าง / วันนัด / ประเภทงาน
           </div>
         </div>
+      </div>
+      <div class="mt-3 pt-2 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="small text-muted">
+          <i class="bi bi-file-earmark-excel text-success me-1"></i>
+          ไฟล์ที่รองรับ: <strong>receipt_report_export_*.xlsx</strong>
+          — header แถวที่ 12 ข้อมูลเริ่มแถวที่ 13
+        </div>
+        <a href="<?= base_url('assets/files/receipt_report_template.xlsx') ?>" download
+           class="btn btn-sm btn-outline-success">
+          <i class="bi bi-download me-1"></i>ดาวน์โหลดไฟล์ตัวอย่าง
+        </a>
       </div>
     </div>
   </div>

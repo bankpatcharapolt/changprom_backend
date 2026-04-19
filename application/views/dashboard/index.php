@@ -97,10 +97,10 @@
           <span><span class="badge me-2" style="background:#f59e0b">●</span>รอดำเนินการ</span>
           <span class="fw-bold" id="s-pending">-</span>
         </div>
-        <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded" style="background:#eff6ff">
+        <!-- <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded" style="background:#eff6ff">
           <span><span class="badge me-2" style="background:#3b82f6">●</span>ยืนยันแล้ว</span>
           <span class="fw-bold" id="s-confirmed">-</span>
-        </div>
+        </div> -->
         <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded" style="background:#f5f3ff">
           <span><span class="badge me-2" style="background:#8b5cf6">●</span>กำลังดำเนินการ</span>
           <span class="fw-bold" id="s-inprog">-</span>

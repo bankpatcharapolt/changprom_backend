@@ -8,63 +8,79 @@ class Dashboard_model extends CI_Model {
     public function get_stats() {
         $today = date('Y-m-d');
 
-        // งานวันนี้
+        // status ภาษาไทยตามที่ใช้จริงในระบบ
+        $s_pending   = 'รอดำเนินการ';
+        $s_confirmed = 'ยืนยันแล้ว';
+        $s_inprog    = 'กำลังดำเนินงาน';
+        $s_done      = 'เสร็จแล้ว';
+        $s_postpone  = 'เลื่อนนัด';
+        $s_cancel    = 'ยกเลิกนัด';
+        $closed      = [$s_done, $s_cancel];
+
+        // งานวันนี้ทั้งหมด
         $today_total = $this->db->where('install_date', $today)->count_all_results($this->table);
 
         // งานวันนี้แยกตามสถานะ
-        $today_pending   = $this->db->where('install_date',$today)->where('status','pending')->count_all_results($this->table);
-        $today_confirmed = $this->db->where('install_date',$today)->where('status','confirmed')->count_all_results($this->table);
-        $today_inprog    = $this->db->where('install_date',$today)->where('status','in_progress')->count_all_results($this->table);
-        $today_done      = $this->db->where('install_date',$today)->where('status','completed')->count_all_results($this->table);
+        $today_pending   = $this->db->where('install_date',$today)->where('status',$s_pending)  ->count_all_results($this->table);
+        $today_confirmed = $this->db->where('install_date',$today)->where('status',$s_confirmed)->count_all_results($this->table);
+        $today_inprog    = $this->db->where('install_date',$today)->where('status',$s_inprog)   ->count_all_results($this->table);
+        $today_done      = $this->db->where('install_date',$today)->where('status',$s_done)     ->count_all_results($this->table);
 
-        // งานยังไม่ปิด (ไม่ใช่ completed/cancelled)
-        $open_jobs = $this->db->where_not_in('status',['completed','cancelled'])->count_all_results($this->table);
+        // งานยังไม่ปิด (ไม่ใช่ เสร็จแล้ว/ยกเลิกนัด)
+        $open_jobs = $this->db->where_not_in('status', $closed)->count_all_results($this->table);
 
-        // งานเกินกำหนด (install_date < today และยังไม่ปิด)
-        $overdue = $this->db->where('install_date <', $today)
-            ->where_not_in('status',['completed','cancelled'])
-            ->where('install_date IS NOT NULL')
+        // งานเกินกำหนด (install_date < today ยังไม่ปิด มีวันนัด)
+        $overdue = $this->db
+            ->where('install_date <', $today)
+            ->where('install_date IS NOT NULL', null, false)
+            ->where('install_date !=', '')
+            ->where_not_in('status', $closed)
             ->count_all_results($this->table);
 
-        // งานทั้งหมด
-        $total_all = $this->db->count_all($this->table);
+        // งานทั้งหมด / งานเสร็จทั้งหมด
+        $total_all  = $this->db->count_all($this->table);
+        $total_done = $this->db->where('status', $s_done)->count_all_results($this->table);
 
-        // งานเสร็จทั้งหมด
-        $total_done = $this->db->where('status','completed')->count_all_results($this->table);
-
-        // งานสัปดาห์นี้
+        // งานสัปดาห์นี้ (จันทร์-อาทิตย์)
         $week_start = date('Y-m-d', strtotime('monday this week'));
         $week_end   = date('Y-m-d', strtotime('sunday this week'));
-        $this_week  = $this->db->where('install_date >=', $week_start)->where('install_date <=', $week_end)->count_all_results($this->table);
+        $this_week  = $this->db
+            ->where('install_date >=', $week_start)
+            ->where('install_date <=', $week_end)
+            ->count_all_results($this->table);
 
         // งานช่างวันนี้
         $tech_load = $this->get_technician_load($today);
 
-        // งาน 7 วันข้างหน้า
+        // งานใกล้ถึงกำหนด 7 วัน (ยังไม่ปิด)
         $upcoming = $this->db
             ->where('install_date >=', $today)
             ->where('install_date <=', date('Y-m-d', strtotime('+7 days')))
-            ->where_not_in('status',['completed','cancelled'])
-            ->order_by('install_date','ASC')->order_by('install_time','ASC')
+            ->where_not_in('status', $closed)
+            ->order_by('install_date','ASC')
+            ->order_by('install_time','ASC')
             ->limit(10)
             ->get($this->table)->result_array();
 
-        // สถิติรายเดือน (6 เดือนย้อนหลัง)
+        // สถิติรายเดือน 6 เดือนย้อนหลัง
         $monthly = [];
         for ($i = 5; $i >= 0; $i--) {
-            $m = date('Y-m', strtotime("-$i months"));
+            $m   = date('Y-m', strtotime("-$i months"));
             $cnt = $this->db->like('install_date', $m, 'after')->count_all_results($this->table);
             $monthly[] = ['month' => $m, 'count' => $cnt];
         }
 
-        return compact('today_total','today_pending','today_confirmed','today_inprog','today_done',
-            'open_jobs','overdue','total_all','total_done','this_week','tech_load','upcoming','monthly','today');
+        return compact(
+            'today_total','today_pending','today_confirmed','today_inprog','today_done',
+            'open_jobs','overdue','total_all','total_done','this_week',
+            'tech_load','upcoming','monthly','today'
+        );
     }
 
     public function get_technician_load($date) {
         $rows = $this->db->select('technician, COUNT(*) as job_count, 
-            SUM(CASE WHEN status="completed" THEN 1 ELSE 0 END) as done,
-            SUM(CASE WHEN status NOT IN ("completed","cancelled") THEN 1 ELSE 0 END) as open')
+            SUM(CASE WHEN status="เสร็จแล้ว" THEN 1 ELSE 0 END) as done,
+            SUM(CASE WHEN status NOT IN ("เสร็จแล้ว","ยกเลิกนัด") THEN 1 ELSE 0 END) as open')
             ->where('install_date', $date)
             ->where('technician !=', '')
             ->where('technician IS NOT NULL')
@@ -167,14 +183,9 @@ public function check_duplicate_assign($technician, $install_date, $install_time
             $this->db->group_end();
         }
       
-        $rows = $this->db->select('id, bill_no, customer_name, phone, product_service,
+        return $this->db->select('id, bill_no, customer_name, phone, product_service,
                                   install_date, install_time, technician, status, job_type')
             ->limit(20)->get($this->table)->result_array();
-
-        foreach ($rows as &$row) {
-            $row['has_technician'] = !empty(trim($row['technician'] ?? ''));
-        }
-        return $rows;
     }
 
    public function get_technicians() {

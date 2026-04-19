@@ -30,6 +30,75 @@ class Service extends CI_Controller {
         $this->load->view('templates/footer');
     }
 
+    // ── Debug endpoint: POST /service/import_debug ────────────────────
+    // ใช้ตรวจสอบว่า parse และ insert ทำงานได้จริงไหม (superadmin only)
+    public function import_debug() {
+        header('Content-Type: application/json; charset=utf-8');
+        if ($this->session->userdata('role') !== 'superadmin') {
+            echo json_encode(['success'=>false,'message'=>'ไม่มีสิทธิ์']); return;
+        }
+        if (empty($_FILES['excel_file']['name'])) {
+            echo json_encode(['success'=>false,'message'=>'กรุณาเลือกไฟล์']); return;
+        }
+        $ext  = strtolower(pathinfo($_FILES['excel_file']['name'], PATHINFO_EXTENSION));
+        $dest = FCPATH . 'uploads/debug_' . time() . '.' . $ext;
+        if (!move_uploaded_file($_FILES['excel_file']['tmp_name'], $dest)) {
+            echo json_encode(['success'=>false,'message'=>'upload ล้มเหลว']); return;
+        }
+        $rows = $this->_read_xlsx_native($dest);
+        @unlink($dest);
+
+        $result = [
+            'rows_total'   => is_array($rows) ? count($rows) : 'false/error',
+            'row_sample'   => [],
+            'header_found' => false,
+            'data_start'   => 0,
+            'first_3_jobs' => [],
+            'db_test'      => null,
+        ];
+
+        if (is_array($rows)) {
+            foreach ($rows as $i => $row) {
+                $line = implode('', $row);
+                if (mb_strpos($line, 'เลขที่เอกสาร') !== false) {
+                    $result['header_found'] = true;
+                    $result['data_start']   = $i + 1;
+                    $result['header_row']   = $row;
+                    // sample 3 data rows
+                    for ($j = $i+1; $j < min($i+4, count($rows)); $j++) {
+                        $job = $this->_map_row_new($rows[$j]);
+                        $result['first_3_jobs'][] = $job;
+                    }
+                    break;
+                }
+            }
+            // test DB insert แถวแรก (dry-run: insert แล้ว delete)
+            if (!empty($result['first_3_jobs'][0]['bill_no'])) {
+                $job = $result['first_3_jobs'][0];
+                if (empty($job['job_type'])) $job['job_type'] = 'ติดตั้ง';
+                if (empty($job['status']))   $job['status']   = 'รอดำเนินการ';
+                $uid = $this->session->userdata('user_id');
+                if ($uid) $job['created_by'] = $uid;
+                try {
+                    $exist = $this->Service_model->get_by_bill($job['bill_no']);
+                    if (!$exist) {
+                        $id = $this->Service_model->create($job);
+                        $result['db_test'] = "INSERT OK, id=$id";
+                        // ลบออกเพื่อไม่ให้ข้อมูล dirty
+                        $this->db->where('id', $id)->delete('service_jobs');
+                    } else {
+                        $result['db_test'] = "bill_no exists already (id={$exist['id']})";
+                    }
+                } catch (Exception $e) {
+                    $result['db_test'] = "ERROR: " . $e->getMessage();
+                }
+                // ดู last query
+                $result['last_query'] = $this->db->last_query();
+            }
+        }
+        echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    }
+
     public function import_excel() {
         header('Content-Type: application/json; charset=utf-8');
 
@@ -75,17 +144,17 @@ class Service extends CI_Controller {
     // อ่าน XLSX bank- 20260323 10.04 
     // ================================================================
     private function _read_xlsx_native($file) {
-        if (!class_exists('ZipArchive')) {
-            return false;
-        }
+        if (!class_exists('ZipArchive')) return false;
 
         $zip = new ZipArchive();
         if ($zip->open($file) !== TRUE) return false;
 
-        // อ่าน shared strings
+        // ── อ่าน shared strings ──────────────────────────────────────
         $strings = [];
         $sstRaw = $zip->getFromName('xl/sharedStrings.xml');
         if ($sstRaw) {
+            // strip default namespace ก่อน parse เพราะ simplexml ไม่รองรับ xmlns default
+            $sstRaw = $this->_strip_xlsx_ns($sstRaw);
             $sst = @simplexml_load_string($sstRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
             if ($sst) {
                 foreach ($sst->si as $si) {
@@ -100,12 +169,14 @@ class Service extends CI_Controller {
             }
         }
 
-        // อ่าน sheet แรก
+        // ── อ่าน sheet แรก ──────────────────────────────────────────
         $sheetRaw = $zip->getFromName('xl/worksheets/sheet1.xml');
         $zip->close();
 
         if (!$sheetRaw) return false;
 
+        // strip namespace เพื่อให้ simplexml ทำงานได้ถูกต้อง
+        $sheetRaw = $this->_strip_xlsx_ns($sheetRaw);
         $sheet = @simplexml_load_string($sheetRaw, 'SimpleXMLElement', LIBXML_NOCDATA);
         if (!$sheet) return false;
 
@@ -137,7 +208,21 @@ class Service extends CI_Controller {
             $result[] = $normalized;
         }
 
-        return $result;
+        return count($result) > 0 ? $result : false;
+    }
+
+    // strip default XML namespace ก่อนส่งให้ simplexml_load_string
+    // เพราะ simplexml จะ fail กับ xmlns="..." แบบ default namespace
+    private function _strip_xlsx_ns($xml) {
+        // ลบ BOM ถ้ามี
+        $xml = ltrim($xml, "\xEF\xBB\xBF");
+        // ลบ xmlns declarations ทั้ง default และ prefix
+        $xml = preg_replace('/\s+xmlns(?::\w+)?="[^"]*"/', '', $xml);
+        // ลบ attribute ที่มี namespace prefix เช่น r:id="rId1" (ป้องกัน unbound prefix error)
+        $xml = preg_replace('/\s+\w+:[\w-]+="[^"]*"/', '', $xml);
+        // ลบ namespace prefix ออกจาก tag names เช่น <x:row> → <row>
+        $xml = preg_replace('/<(\/?)[a-zA-Z]+:/', '<$1', $xml);
+        return $xml;
     }
 
     private function _col_index($col) {
@@ -205,7 +290,8 @@ class Service extends CI_Controller {
                 if (empty($billNo)) continue;
                 if (empty($job['job_type'])) $job['job_type'] = 'ติดตั้ง';
                 if (empty($job['status']))   $job['status']   = 'รอดำเนินการ';
-                $job['created_by'] = $this->session->userdata('user_id');
+                $uid = $this->session->userdata('user_id');
+                if ($uid) $job['created_by'] = $uid;
 
                 $exist = $this->Service_model->get_by_bill($billNo);
                 if ($exist) {
@@ -234,7 +320,8 @@ class Service extends CI_Controller {
 
                 if (empty($job['job_type'])) $job['job_type'] = 'ติดตั้ง';
                 if (empty($job['status']))   $job['status']   = 'รอดำเนินการ';
-                $job['created_by'] = $this->session->userdata('user_id');
+                $uid = $this->session->userdata('user_id');
+                if ($uid) $job['created_by'] = $uid;
 
                 $exist = $this->Service_model->get_by_bill($job['bill_no']);
                 if ($exist) {

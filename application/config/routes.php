@@ -25,6 +25,7 @@ $route['dashboard/api_debug_phone'] = 'Dashboard/api_debug_phone';
 $route['service'] = 'Service/index';
 $route['service/import'] = 'Service/import';
 $route['service/import_excel'] = 'Service/import_excel';
+$route['service/import_debug']  = 'Service/import_debug';
 
 // REST API routes
 $route['api/service']['GET']    = 'Api/get_services';

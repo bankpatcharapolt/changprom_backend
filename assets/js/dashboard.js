@@ -15,7 +15,7 @@ function loadStats() {
     document.getElementById('kpi-overdue').textContent = d.overdue;
     document.getElementById('kpi-date').textContent  = d.today;
     document.getElementById('s-pending').textContent   = d.today_pending;
-    document.getElementById('s-confirmed').textContent = d.today_confirmed;
+    // document.getElementById('s-confirmed').textContent = d.today_confirmed;
     document.getElementById('s-inprog').textContent    = d.today_inprog;
     document.getElementById('s-done').textContent      = d.today_done;
     var pct = d.today_total > 0 ? Math.round(d.today_done / d.today_total * 100) : 0;
