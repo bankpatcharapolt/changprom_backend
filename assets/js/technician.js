@@ -82,6 +82,17 @@ window.editTech = function(id) {
     $('#tf_latitude').val(d.latitude || '');
     $('#tf_longitude').val(d.longitude || '');
     $('#tf_active').val(d.active !== undefined ? d.active : 1);
+    // account
+    $('#tf_username').val(d.reg_username || '');
+    $('#tf_password').val('');
+    if (d.reg_username) {
+      $('#tf_account_status_row').show();
+      $('#tf_account_username_display').text(d.reg_username);
+      $('#tf_password_hint_label').text('(เว้นว่าง = ไม่เปลี่ยนรหัส)');
+    } else {
+      $('#tf_account_status_row').hide();
+      $('#tf_password_hint_label').text('');
+    }
     $('#techModalTitle').html('<i class="bi bi-pencil-square me-2"></i>แก้ไขข้อมูลช่าง #' + d.id);
     new bootstrap.Modal(document.getElementById('techModal')).show();
   });
@@ -137,6 +148,9 @@ function openAddTechModal() {
   $('#techModalTitle').html('<i class="bi bi-plus-circle me-2"></i>เพิ่มช่างใหม่');
   $('#tf_reg_name, #tf_reg_address, #tf_reg_telephone, #tf_reg_email, #tf_latitude, #tf_longitude').val('');
   $('#tf_active').val(1);
+  $('#tf_username, #tf_password').val('');
+  $('#tf_account_status_row').hide();
+  $('#tf_password_hint_label').text('');
   new bootstrap.Modal(document.getElementById('techModal')).show();
 }
 
@@ -152,7 +166,9 @@ function saveTech() {
     reg_email:     $('#tf_reg_email').val(),
     latitude:      $('#tf_latitude').val(),
     longitude:     $('#tf_longitude').val(),
-    active:        $('#tf_active').val()
+    active:        $('#tf_active').val(),
+    login_username: $('#tf_username').val().trim(),
+    login_password: $('#tf_password').val()
   };
 
   var url    = id ? BASE + 'api/technician/' + id : BASE + 'api/technician';
@@ -227,6 +243,19 @@ $(document).ready(function() {
 
   $('#btn-add-tech').on('click', openAddTechModal);
   $('#techSaveBtn').on('click', saveTech);
+
+  // toggle show/hide password
+  $('#togglePassword').on('click', function() {
+    var inp = $('#tf_password');
+    var icon = $('#togglePasswordIcon');
+    if (inp.attr('type') === 'password') {
+      inp.attr('type', 'text');
+      icon.removeClass('bi-eye').addClass('bi-eye-slash');
+    } else {
+      inp.attr('type', 'password');
+      icon.removeClass('bi-eye-slash').addClass('bi-eye');
+    }
+  });
 
   // Auto-parse lat,lng เมื่อ paste ค่าแบบ "13.xxx,100.xxx" ลงใน latitude
   $('#tf_latitude').on('blur', parseTechLatLng);

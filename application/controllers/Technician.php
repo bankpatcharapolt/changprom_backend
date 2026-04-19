@@ -89,6 +89,14 @@ class Technician extends CI_Controller {
         if (empty($data['reg_name'])) {
             $this->_json(['success' => false, 'message' => 'กรุณาระบุชื่อช่าง'], 422); return;
         }
+        // เช็ค username ซ้ำ (ถ้ามีการระบุ)
+        if (!empty(trim($data['login_username'] ?? ''))) {
+            $dup = $this->db->where('reg_username', trim($data['login_username']))->get('register')->row_array();
+            if ($dup) { $this->_json(['success' => false, 'message' => 'Username นี้มีอยู่แล้ว'], 409); return; }
+            if (empty(trim($data['login_password'] ?? ''))) {
+                $this->_json(['success' => false, 'message' => 'กรุณาระบุรหัสผ่านสำหรับบัญชีใหม่'], 422); return;
+            }
+        }
         $id = $this->tech_model->create($data);
         $this->_json(['success' => true, 'message' => 'เพิ่มช่างสำเร็จ', 'id' => $id], 201);
     }
@@ -100,6 +108,22 @@ class Technician extends CI_Controller {
         $data = json_decode(file_get_contents('php://input'), true);
         if (empty($data['reg_name'])) {
             $this->_json(['success' => false, 'message' => 'กรุณาระบุชื่อช่าง'], 422); return;
+        }
+        // เช็ค username และ password เฉพาะกรณีที่มีการเปลี่ยนแปลงจริง
+        $new_username = trim($data['login_username'] ?? '');
+        $new_password = trim($data['login_password'] ?? '');
+        $old_username = trim($row['reg_username'] ?? '');
+
+        if (!empty($new_username)) {
+            // เช็ค username ซ้ำกับช่างคนอื่น
+            $dup = $this->db->where('reg_username', $new_username)->where('id !=', $id)->get('register')->row_array();
+            if ($dup) { $this->_json(['success' => false, 'message' => 'Username นี้มีอยู่แล้ว'], 409); return; }
+
+            // บังคับใส่ password เฉพาะกรณีตั้ง username ใหม่ที่ยังไม่เคยมี password มาก่อน
+            $has_pass = $this->db->select('reg_pass')->where('id', $id)->get('register')->row_array();
+            if (empty($has_pass['reg_pass']) && empty($new_password)) {
+                $this->_json(['success' => false, 'message' => 'กรุณาระบุรหัสผ่านสำหรับบัญชีใหม่'], 422); return;
+            }
         }
         $this->tech_model->update($id, $data);
         $this->_json(['success' => true, 'message' => 'แก้ไขข้อมูลสำเร็จ']);

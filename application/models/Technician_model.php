@@ -24,7 +24,7 @@ class Technician_model extends CI_Model {
 
     public function get_by_id($id) {
         return $this->db
-            ->select('id, reg_name, reg_address, reg_telephone, reg_email, latitude, longitude, active, created, updated')
+            ->select('id, reg_name, reg_address, reg_telephone, reg_email, latitude, longitude, active, created, updated, reg_username')
             ->from($this->table)->where('id', $id)->get()->row_array();
     }
 
@@ -82,6 +82,17 @@ class Technician_model extends CI_Model {
             'active'        => isset($data['active']) ? (int)$data['active'] : 1,
             'updated'       => date('Y-m-d H:i:s'),
         ];
+        // บันทึก username
+        if (isset($data['login_username'])) {
+            $row['reg_username'] = trim($data['login_username']) ?: null;
+        }
+        // บันทึก password เฉพาะตอนสร้างใหม่หรือถ้ามีการระบุมา
+        if (!empty($data['login_password'])) {
+            $row['reg_pass'] = password_hash(trim($data['login_password']), PASSWORD_DEFAULT);
+        } elseif ($is_new && !empty($data['login_username'])) {
+            // ถ้าสร้างใหม่และมี username แต่ไม่มี password — ค่าว่าง
+            $row['reg_pass'] = null;
+        }
         if ($is_new) $row['created'] = date('Y-m-d H:i:s');
         return $row;
     }

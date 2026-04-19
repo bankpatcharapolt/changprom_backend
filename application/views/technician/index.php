@@ -119,6 +119,41 @@
             <textarea class="form-control" id="tf_reg_address" rows="2" placeholder="บ้านเลขที่ ถนน ตำบล อำเภอ จังหวัด"></textarea>
           </div>
 
+          <!-- ── Login Account ── -->
+          <div class="col-12">
+            <hr class="my-1">
+            <label class="form-label fw-medium">
+              <i class="bi bi-person-lock me-1 text-primary"></i>บัญชีเข้าสู่ระบบ (สำหรับช่าง)
+            </label>
+            <div class="p-3 bg-light rounded-3 border">
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label small text-muted mb-1">Username</label>
+                  <input type="text" class="form-control" id="tf_username" placeholder="ชื่อผู้ใช้" autocomplete="off">
+                  <div class="form-text" id="tf_username_hint">เว้นว่างไว้ถ้าไม่ต้องการตั้ง</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small text-muted mb-1">
+                    Password <span id="tf_password_hint_label" class="text-muted">(กรณีอยู่ในหน้าแก้ไขเว้นว่าง = ไม่เปลี่ยน)</span>
+                  </label>
+                  <div class="input-group">
+                    <input type="text" class="form-control" id="tf_password" placeholder="รหัสผ่าน" autocomplete="new-password">
+                    <!-- <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                      <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                    </button> -->
+                  </div>
+                </div>
+                <div class="col-12" id="tf_account_status_row" style="display:none">
+                  <div class="alert alert-info py-1 px-2 mb-0 small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    มีบัญชีอยู่แล้ว: <strong id="tf_account_username_display"></strong>
+                    — เว้นว่าง Password ไว้เพื่อคงรหัสเดิม
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Location GPS -->
           <div class="col-12">
             <label class="form-label fw-medium">

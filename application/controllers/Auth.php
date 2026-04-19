@@ -37,8 +37,21 @@ class Auth extends CI_Controller {
                 ]);
                 redirect('dashboard');
             } else {
-                $this->session->set_flashdata('error', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-                redirect('login');
+                // ลอง login ด้วยบัญชีช่าง (register table: reg_username / reg_pass)
+                $tech = $this->db->where('reg_username', $username)->get('register')->row_array();
+                if ($tech && !empty($tech['reg_pass']) && password_verify($password, $tech['reg_pass'])) {
+                    $this->session->set_userdata([
+                        'logged_in'  => TRUE,
+                        'user_id'    => $tech['id'],
+                        'username'   => $tech['reg_username'],
+                        'full_name'  => $tech['reg_name'],
+                        'role'       => 'technician',
+                    ]);
+                    redirect('dashboard');
+                } else {
+                    $this->session->set_flashdata('error', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+                    redirect('login');
+                }
             }
         }
 
