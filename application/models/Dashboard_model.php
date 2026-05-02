@@ -125,9 +125,10 @@ class Dashboard_model extends CI_Model {
         $start_dt .= 'T' . substr($r['install_time'], 0, 5);
     }
     $color   = $colorMap[$r['status']] ?? '#6b7280';
-    $jobType = $r['job_type'] ? '[' . $r['job_type'] . '] ' : '';
-    $zone    = !empty($r['tech_zone']) ? '[' . $r['tech_zone'] . ']' : '';
-    $tech    = $r['technician'] ? ' [' . $r['technician'] . ']' . ($zone ? $zone : '') : '';
+    $time    = !empty($r['install_time']) ? substr($r['install_time'], 0, 5) : '';
+    $zone    = !empty($r['tech_zone'])   ? '[' . $r['tech_zone']   . ']' : '';
+    $tech    = !empty($r['technician'])  ? '[' . $r['technician']  . ']' : '';
+    $jobType = !empty($r['job_type'])    ? '[' . $r['job_type']    . ']' : '';
 
         $r['tech_phone'] = '';
         if (!empty($r['technician_id']) && isset($techMap[(int)$r['technician_id']])) {
@@ -136,7 +137,12 @@ class Dashboard_model extends CI_Model {
    
 $events[] = [
         'id'              => $r['id'],
-        'title'           => $jobType . ($r['bill_no'] ?: '#'.$r['id']) . ' ' . $r['customer_name'] . $tech,
+        'title'           => implode(' ', array_filter([
+                                $r['customer_name'] ?? '',
+                                $zone,
+                                $tech,
+                                $jobType,
+                            ])),
         'start'           => $start_dt,       // ← แต่ถ้า $start_dt ไม่ถูก assign จะเป็น null
         'backgroundColor' => $color,
         'borderColor'     => $color,

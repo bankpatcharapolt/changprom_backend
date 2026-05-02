@@ -79,6 +79,13 @@ function initCalendar() {
     initialView  : getInitialView(),
     height       : 'auto',
     dayMaxEvents : isMobile() ? 3 : 4,
+    displayEventTime: true,
+    eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+    views: {
+      dayGridMonth: { displayEventTime: true },
+      timeGridWeek: { displayEventTime: false },
+      listWeek:     { displayEventTime: true },
+    },
 
     headerToolbar: {
       left  : 'prev,next today',
