@@ -273,6 +273,13 @@
             <input type="hidden" id="assign-tech-id">
           </div>
 
+          <!-- Zone -->
+          <div class="col-12">
+            <label class="form-label mb-1">Zone <span class="text-muted small">(พื้นที่รับผิดชอบ)</span></label>
+            <input type="text" id="assign-zone" class="form-control form-control-sm"
+                   placeholder="เช่น โซนเหนือ, ลาดพร้าว, Zone A...">
+          </div>
+
           <div class="col-6">
             <label class="form-label mb-1">ค่าจ้างช่าง (บาท)</label>
             <div class="input-group input-group-sm">
@@ -296,6 +303,21 @@
           <div class="col-6">
             <label class="form-label mb-1">เวลา</label>
             <input type="time" id="assign-time" class="form-control form-control-sm">
+          </div>
+
+          <!-- Google Maps Link -->
+          <div class="col-12">
+            <label class="form-label mb-1">
+              <i class="bi bi-geo-alt-fill text-danger me-1"></i>Google Maps Link
+            </label>
+            <div class="input-group input-group-sm">
+              <input type="url" id="assign-map-link" class="form-control form-control-sm"
+                     placeholder="https://maps.google.com/... หรือ https://goo.gl/maps/...">
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="btn-open-map"
+                      style="display:none" title="เปิด Google Maps">
+                <i class="bi bi-box-arrow-up-right"></i>
+              </button>
+            </div>
           </div>
 
         </div>

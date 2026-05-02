@@ -93,7 +93,8 @@ class Dashboard_model extends CI_Model {
    public function get_calendar_events($start, $end) {
     $rows = $this->db->select('id, bill_no, customer_name, technician, technician_id,
                                install_date, install_time, status, job_type,
-                               product_service, phone, tech_wage, tech_note')
+                               product_service, phone, tech_wage, tech_note,
+                               tech_zone, map_link')
         ->where('install_date IS NOT NULL')
         ->where('install_date !=', '');
     if ($start) $rows->where('install_date >=', substr($start,0,10));
@@ -125,7 +126,8 @@ class Dashboard_model extends CI_Model {
     }
     $color   = $colorMap[$r['status']] ?? '#6b7280';
     $jobType = $r['job_type'] ? '[' . $r['job_type'] . '] ' : '';
-    $tech    = $r['technician'] ? ' [' . $r['technician'] . ']' : '';
+    $zone    = !empty($r['tech_zone']) ? '[' . $r['tech_zone'] . ']' : '';
+    $tech    = $r['technician'] ? ' [' . $r['technician'] . ']' . ($zone ? $zone : '') : '';
 
         $r['tech_phone'] = '';
         if (!empty($r['technician_id']) && isset($techMap[(int)$r['technician_id']])) {

@@ -159,9 +159,13 @@ window.openAssignModal = function(date, time) {
   $('#job-search-input').val('');
   $('#job-results').html('<div class="text-center text-muted py-3 small">พิมพ์เพื่อค้นหา...</div>');
   $('#selected-job-preview').addClass('d-none');
-  $('#assign-tech-select').prop('selectedIndex', 0);
+  var _ts = document.getElementById('assign-tech-select') && document.getElementById('assign-tech-select').tomselect;
+  if (_ts) { _ts.clear(true); } else { $('#assign-tech-select').prop('selectedIndex', 0); }
   $('#assign-tech-input').val('');
   $('#assign-tech-id').val('');
+  $('#assign-zone').val('');
+  $('#assign-map-link').val('');
+  if (typeof $ !== 'undefined') $('#btn-open-map').hide();
   $('#assign-job-type').val('');
   $('#assign-tech-wage').val('');
   $('#assign-tech-note').val('');
@@ -245,6 +249,8 @@ window.saveAssign = function(force) {
   var time    = $('#assign-time').val();
   var wage    = $('#assign-tech-wage').val();
   var note    = $('#assign-tech-note').val().trim();
+  var zone    = $('#assign-zone').val().trim();
+  var mapLink = $('#assign-map-link').val().trim();
 
   if (!id)      { Swal.fire('แจ้งเตือน', 'กรุณาเลือกงานก่อน', 'warning'); return; }
   if (!jobType) { Swal.fire('แจ้งเตือน', 'กรุณาเลือกประเภทงาน', 'warning'); return; }
@@ -263,6 +269,8 @@ window.saveAssign = function(force) {
       install_time:  time,
       tech_wage:     wage ? parseFloat(wage) : null,
       tech_note:     note || null,
+      tech_zone:     zone || null,
+      map_link:      mapLink || null,
       force:         force || false,
     }),
     success: function(r) {
@@ -304,9 +312,20 @@ window.editEvent = function() {
 
     // ── fill ข้อมูลคิว ──
     $('#assign-job-type').val(p.job_type      || '');
-    $('#assign-tech-select').val(p.technician || '');
+    // TomSelect: set value programmatically
+    var _ts = document.getElementById('assign-tech-select').tomselect;
+    if (_ts) {
+      _ts.clear(true);
+      if (p.technician) _ts.setValue(p.technician);
+    } else {
+      $('#assign-tech-select').val(p.technician || '');
+    }
     $('#assign-tech-input').val(p.technician  || '');
     $('#assign-tech-id').val(p.technician_id  || '');
+    $('#assign-zone').val(p.tech_zone         || '');
+    var mapLink = p.map_link || '';
+    $('#assign-map-link').val(mapLink);
+    if (mapLink) { $('#btn-open-map').show(); } else { $('#btn-open-map').hide(); }
     $('#assign-tech-wage').val(p.tech_wage    || '');
     $('#assign-tech-note').val(p.tech_note    || '');
     $('#assign-date').val(p.install_date      || '');
@@ -412,7 +431,13 @@ function showEventDetail(event) {
     + row3('ชื่อช่าง',      p.technician || '-')
     + row3('เบอร์ช่าง',     techPhone)
     + row3('ค่าจ้างช่าง',  wageHtml)
+    + row3('Zone', p.tech_zone || '-')
     + (p.tech_note ? '<div class="col-12"><div class="small text-muted">หมายเหตุช่าง</div><div class="fw-medium" style="font-size:.85rem">' + p.tech_note + '</div></div>' : '')
+    + '<div class="col-12"><div class="small text-muted">Google Maps</div>'
+    + (p.map_link
+        ? '<a href="' + p.map_link + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger mt-1"><i class="bi bi-geo-alt-fill me-1"></i>เปิด Google Maps</a>'
+        : '<div class="fw-medium" style="font-size:.85rem">-</div>')
+    + '</div>'
     + '</div></div>'
   );
   getEventModal().show();
@@ -433,17 +458,44 @@ $(document).ready(function() {
   loadTechnicians();
   initCalendar();
 
-  // sync select ↔ free-text
-  $('#assign-tech-select').on('change', function() {
-    var sel = $(this).find('option:selected');
-    $('#assign-tech-input').val('');
-    $('#assign-tech-id').val(sel.data('id') || '');
+  // ── TomSelect สำหรับ assign-tech-select (ค้นหาชื่อช่างได้) ────
+  new TomSelect('#assign-tech-select', {
+    placeholder: '-- เลือกหรือพิมพ์ค้นหาช่าง --',
+    allowEmptyOption: true,
+    maxOptions: 300,
+    onChange: function(val) {
+      if (!val) {
+        $('#assign-tech-input').val('');
+        $('#assign-tech-id').val('');
+        return;
+      }
+      // ดึง data-id จาก option เดิม
+      var opt = document.querySelector('#assign-tech-select option[value="' + val.replace(/"/g, '\"') + '"]');
+      $('#assign-tech-input').val('');
+      $('#assign-tech-id').val(opt ? (opt.dataset.id || '') : '');
+    }
   });
+
+  // sync free-text input (ช่างนอกระบบ) → clear TomSelect
   $('#assign-tech-input').on('input', function() {
     if ($(this).val().trim()) {
-      $('#assign-tech-select').prop('selectedIndex', 0);
+      var ts = document.getElementById('assign-tech-select').tomselect;
+      if (ts) ts.clear(true);
       $('#assign-tech-id').val('');
     }
+  });
+
+  // ── Google Maps link preview ──────────────────────────────────
+  function updateMapBtn() {
+    var v = $('#assign-map-link').val().trim();
+    if (v) { $('#btn-open-map').show(); } else { $('#btn-open-map').hide(); }
+  }
+  $('#assign-map-link').on('input paste change', function() {
+    setTimeout(updateMapBtn, 50); // รอให้ paste เสร็จก่อน
+  });
+  $('#btn-open-map').on('click', function() {
+    var url = $('#assign-map-link').val().trim();
+    if (url) window.open(url, '_blank', 'noopener');
   });
 
   // ── unlock step1 ทุกครั้งที่ modal ปิด ──
