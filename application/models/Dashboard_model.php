@@ -91,15 +91,18 @@ class Dashboard_model extends CI_Model {
     }
 
    public function get_calendar_events($start, $end) {
-    $rows = $this->db->select('id, bill_no, customer_name, technician, technician_id,
-                               install_date, install_time, status, job_type,
-                               product_service, phone, tech_wage, tech_note,
-                               tech_zone, map_link')
-        ->where('install_date IS NOT NULL')
-        ->where('install_date !=', '');
-    if ($start) $rows->where('install_date >=', substr($start,0,10));
-    if ($end)   $rows->where('install_date <=', substr($end,0,10));
-    $rows = $rows->get($this->table)->result_array();
+    $rows = $this->db->select('sj.id, sj.bill_no, sj.customer_name, sj.technician, sj.technician_id,
+                               sj.install_date, sj.install_time, sj.status, sj.job_type,
+                               sj.product_service, sj.phone, sj.tech_wage, sj.tech_note,
+                               sj.tech_zone, sj.map_link, sj.vehicle_id,
+                               CONCAT(v.vehicle_type, " (", v.license_plate, ")") AS vehicle_label')
+        ->from($this->table . ' sj')
+        ->join('vehicles v', 'v.id = sj.vehicle_id', 'left')
+        ->where('sj.install_date IS NOT NULL')
+        ->where('sj.install_date !=', '');
+    if ($start) $rows->where('sj.install_date >=', substr($start,0,10));
+    if ($end)   $rows->where('sj.install_date <=', substr($end,0,10));
+    $rows = $rows->get()->result_array();
 
     $events = []; // ← initialize ก่อนเสมอ
 

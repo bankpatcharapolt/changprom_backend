@@ -36,6 +36,11 @@ $route['api/service/(:num)']['DELETE'] = 'Api/delete_service/$1';
 $route['api/service/datatable']['POST'] = 'Api/datatable';
 
 
+// หน้าจัดการยานพาหนะ
+$route['vehicle']              = 'Vehicle/index';
+$route['api/vehicle']          = 'Vehicle/api_list';
+$route['api/vehicle/(:num)']   = 'Vehicle/api_get/$1';
+
 // หน้าจัดการช่าง
 $route['technician']                       = 'Technician/index';
 

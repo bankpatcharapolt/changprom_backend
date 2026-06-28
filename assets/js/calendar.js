@@ -30,16 +30,30 @@ function getInitialView() {
 }
 
 
-// function loadTechnicians() {
-//   $.get(BASE + 'dashboard/api_technicians', function(r) {
-//     var data = r.data || r;
-//     var opts = '<option value="">-- ช่างทั้งหมด --</option>';
-//     data.forEach(function(t) {
-//       opts += '<option value="' + t.reg_name + '">' + t.reg_name + '</option>';
-//     });
-//     $('#filter-tech').html(opts);
-//   });
-// }
+function loadVehicles() {
+  $.get(BASE + 'api/vehicle', function(r) {
+    if (!r.success || !r.data) return;
+    var ts = document.getElementById('assign-vehicle-select') && document.getElementById('assign-vehicle-select').tomselect;
+    var opts = '<option value="">-- ไม่ระบุยานพาหนะ --</option>';
+    r.data.filter(function(v){ return v.active == 1; }).forEach(function(v) {
+      var label = v.vehicle_type + ' (' + v.license_plate + ')';
+      opts += '<option value="' + v.id + '">' + label + '</option>';
+    });
+    if (ts) {
+      ts.destroy();
+    }
+    $('#assign-vehicle-select').html(opts);
+    new TomSelect('#assign-vehicle-select', {
+      placeholder: '-- เลือกหรือพิมพ์ค้นหายานพาหนะ --',
+      allowEmptyOption: true,
+      maxOptions: 300,
+      onChange: function(val) {
+        $('#assign-vehicle-id').val(val || '');
+      }
+    });
+  });
+}
+
 function loadTechnicians() {
   $.get(BASE + 'dashboard/api_technicians', function(r) {
     var data = r.data || r;
@@ -173,6 +187,9 @@ window.openAssignModal = function(date, time) {
   $('#assign-zone').val('');
   $('#assign-map-link').val('');
   if (typeof $ !== 'undefined') $('#btn-open-map').hide();
+  var _vts = document.getElementById('assign-vehicle-select') && document.getElementById('assign-vehicle-select').tomselect;
+  if (_vts) { _vts.clear(true); } else { $('#assign-vehicle-select').val(''); }
+  $('#assign-vehicle-id').val('');
   $('#assign-job-type').val('');
   $('#assign-tech-wage').val('');
   $('#assign-tech-note').val('');
@@ -278,6 +295,7 @@ window.saveAssign = function(force) {
       tech_note:     note || null,
       tech_zone:     zone || null,
       map_link:      mapLink || null,
+      vehicle_id:    $('#assign-vehicle-id').val() ? parseInt($('#assign-vehicle-id').val()) : null,
       force:         force || false,
     }),
     success: function(r) {
@@ -333,6 +351,10 @@ window.editEvent = function() {
     var mapLink = p.map_link || '';
     $('#assign-map-link').val(mapLink);
     if (mapLink) { $('#btn-open-map').show(); } else { $('#btn-open-map').hide(); }
+    var _vts2 = document.getElementById('assign-vehicle-select') && document.getElementById('assign-vehicle-select').tomselect;
+    if (_vts2) { _vts2.clear(true); if (p.vehicle_id) _vts2.setValue(p.vehicle_id); }
+    else { $('#assign-vehicle-select').val(p.vehicle_id || ''); }
+    $('#assign-vehicle-id').val(p.vehicle_id || '');
     $('#assign-tech-wage').val(p.tech_wage    || '');
     $('#assign-tech-note').val(p.tech_note    || '');
     $('#assign-date').val(p.install_date      || '');
@@ -439,6 +461,7 @@ function showEventDetail(event) {
     + row3('เบอร์ช่าง',     techPhone)
     + row3('ค่าจ้างช่าง',  wageHtml)
     + row3('Zone', p.tech_zone || '-')
+    + row3('ยานพาหนะ', p.vehicle_label || '-')
     + (p.tech_note ? '<div class="col-12"><div class="small text-muted">หมายเหตุช่าง</div><div class="fw-medium" style="font-size:.85rem">' + p.tech_note + '</div></div>' : '')
     + '<div class="col-12"><div class="small text-muted">Google Maps</div>'
     + (p.map_link
@@ -463,6 +486,7 @@ function esc(s) { return (s || '').replace(/'/g, "\\'"); }
 // ── Document ready ────────────────────────────────────────────
 $(document).ready(function() {
   loadTechnicians();
+  loadVehicles();
   initCalendar();
 
   // ── TomSelect สำหรับ assign-tech-select (ค้นหาชื่อช่างได้) ────

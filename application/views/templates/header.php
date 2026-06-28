@@ -54,6 +54,11 @@ var ASSET = '<?= base_url() ?>';
             <i class="bi bi-list-ul me-1"></i>รายการงาน
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link <?= strpos(uri_string(),'vehicle')!==false?'active':'' ?>" href="<?= site_url('vehicle') ?>">
+            <i class="bi bi-car-front-fill me-1"></i>ยานพาหนะ
+          </a>
+        </li>
         <?php if ($this->session->userdata('role') === 'superadmin'): ?>
         <li class="nav-item">
           <a class="nav-link <?= strpos(uri_string(),'import')!==false?'active':'' ?>" href="<?= site_url('service/import') ?>">

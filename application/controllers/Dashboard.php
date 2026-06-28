@@ -90,8 +90,9 @@ class Dashboard extends CI_Controller {
     $jobType  = trim($input['job_type']       ?? '');
     $wage     = isset($input['tech_wage']) && $input['tech_wage'] !== null ? (float)$input['tech_wage'] : null;
     $techNote = trim($input['tech_note']      ?? '');
-    $techZone = trim($input['tech_zone']      ?? '');
-    $mapLink  = trim($input['map_link']       ?? '');
+    $techZone  = trim($input['tech_zone']      ?? '');
+    $mapLink   = trim($input['map_link']       ?? '');
+    $vehicleId = isset($input['vehicle_id']) && $input['vehicle_id'] ? (int)$input['vehicle_id'] : null;
     $force    = !empty($input['force']);
     $techId   = !empty($input['technician_id']) ? (int)$input['technician_id'] : null;
 
@@ -131,6 +132,7 @@ class Dashboard extends CI_Controller {
         if ($techNote !== '') $updateData['tech_note']     = $techNote;
         if ($techZone !== '') $updateData['tech_zone']     = $techZone;
         if ($mapLink  !== '') $updateData['map_link']      = $mapLink;
+        $updateData['vehicle_id'] = $vehicleId;
 
     } else {
         $updateData = [

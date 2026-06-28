@@ -305,6 +305,17 @@
             <input type="time" id="assign-time" class="form-control form-control-sm">
           </div>
 
+          <!-- ยานพาหนะ -->
+          <div class="col-12">
+            <label class="form-label mb-1">
+              <i class="bi bi-car-front-fill text-primary me-1"></i>ยานพาหนะ
+            </label>
+            <select id="assign-vehicle-select" class="form-select form-select-sm">
+              <option value="">-- ไม่ระบุยานพาหนะ --</option>
+            </select>
+            <input type="hidden" id="assign-vehicle-id">
+          </div>
+
           <!-- Google Maps Link -->
           <div class="col-12">
             <label class="form-label mb-1">
