@@ -56,56 +56,52 @@ class CustomerMap extends CI_Controller {
             GROUP BY base.customer_name
         ";
 
-        // ── ดึง job ตัวแทนต่อลูกค้า (ใช้ job ที่ติดตั้งครั้งแรก เพื่อได้ location) ──
-        $sql = "
-            SELECT
-                sj.id,
-                sj.bill_no,
-                sj.customer_name,
-                sj.phone,
-                sj.address,
-                sj.location,
-                sj.map_link,
-                sj.install_date,
-                sj.purchase_date,
-                sj.product_service,
-                sj.job_type,
-                sj.technician,
-                sj.status,
-                sj.tech_zone,
-                sj.close_lat,
-                sj.close_lng,
-                sj.start_lat,
-                sj.start_lng,
-                ls.last_service_date,
-                DATEDIFF(CURDATE(), ls.last_service_date) AS days_since
-            FROM service_jobs sj
-            LEFT JOIN ({$sql_last_service}) ls ON ls.customer_name = sj.customer_name
-            WHERE (
-                (sj.close_lat IS NOT NULL AND sj.close_lat != '')
-                OR (sj.start_lat IS NOT NULL AND sj.start_lat != '')
-              )
-              AND sj.status NOT IN ('ยกเลิกนัด')
-              AND sj.job_type = 'ติดตั้ง'
-        ";
-
-        // ค้นหา
+        // ── ดึง job id ตัวแทนต่อลูกค้า (job_type=ติดตั้ง ที่มีพิกัด ล่าสุด) ──
+        // ใช้ subquery หา id ก่อน แล้วค่อย JOIN เพื่อหลีกเลี่ยง ONLY_FULL_GROUP_BY
+        $where_extra = '';
         $binds = [];
         if (!empty($q)) {
-            $sql .= " AND (sj.customer_name LIKE ? OR sj.bill_no LIKE ? OR sj.address LIKE ?)";
+            $where_extra .= " AND (sj2.customer_name LIKE ? OR sj2.bill_no LIKE ? OR sj2.address LIKE ?)";
             $binds[] = "%{$q}%";
             $binds[] = "%{$q}%";
             $binds[] = "%{$q}%";
         }
         if (!empty($tech)) {
-            $sql .= " AND sj.technician LIKE ?";
+            $where_extra .= " AND sj2.technician LIKE ?";
             $binds[] = "%{$tech}%";
         }
 
-        // ใช้ record เดียวต่อ customer_name (ตัวแทนที่มี location)
-        $sql .= " GROUP BY sj.customer_name ORDER BY sj.install_date DESC";
+        $sql_representative = "
+            SELECT MAX(sj2.id) AS rep_id
+            FROM service_jobs sj2
+            WHERE (
+                (sj2.close_lat IS NOT NULL AND sj2.close_lat != '')
+                OR (sj2.start_lat IS NOT NULL AND sj2.start_lat != '')
+              )
+              AND sj2.status NOT IN ('ยกเลิกนัด')
+              AND sj2.job_type = 'ติดตั้ง'
+              {$where_extra}
+            GROUP BY sj2.customer_name
+        ";
 
-        $query = $this->db->query($sql, $binds);
+        $sql = "
+            SELECT
+                sj.id, sj.bill_no, sj.customer_name, sj.phone,
+                sj.address, sj.location, sj.map_link,
+                sj.install_date, sj.purchase_date,
+                sj.product_service, sj.job_type,
+                sj.technician, sj.status, sj.tech_zone,
+                sj.close_lat, sj.close_lng,
+                sj.start_lat, sj.start_lng,
+                ls.last_service_date,
+                DATEDIFF(CURDATE(), ls.last_service_date) AS days_since
+            FROM service_jobs sj
+            INNER JOIN ({$sql_representative}) rep ON rep.rep_id = sj.id
+            LEFT JOIN ({$sql_last_service}) ls ON ls.customer_name = sj.customer_name
+            ORDER BY sj.install_date DESC
+        ";
+
+        $query = $this->db->query($sql, array_merge($binds, $binds));
         $rows  = $query->result_array();
 
         $markers = [];
