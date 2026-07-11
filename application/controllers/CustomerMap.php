@@ -101,7 +101,7 @@ class CustomerMap extends CI_Controller {
             ORDER BY sj.install_date DESC
         ";
 
-        $query = $this->db->query($sql, array_merge($binds, $binds));
+        $query = $this->db->query($sql, $binds);
         $rows  = $query->result_array();
 
         $markers = [];
