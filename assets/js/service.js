@@ -268,6 +268,18 @@ $(document).ready(function() {
     dom: '<"row"<"col-sm-6"l><"col-sm-6"f>>rtip'
   });
 
+  // ── Auto-search จาก URL parameter ?search=xxx ─────────────
+  (function() {
+    var params = new URLSearchParams(window.location.search);
+    var q = params.get('search');
+    if (q) {
+      serviceTable.search(q).draw();
+      // ยัดค่าลงใน search box ของ DataTable ด้วย
+      var dtSearch = document.querySelector('#serviceTable_wrapper input[type=search]');
+      if (dtSearch) { dtSearch.value = q; dtSearch.dispatchEvent(new Event('input')); }
+    }
+  })();
+
   // ปุ่มเพิ่มรายการ
   $('#btn-add-new').on('click', openAddModal);
 

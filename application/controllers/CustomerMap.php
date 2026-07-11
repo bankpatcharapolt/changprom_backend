@@ -1,0 +1,206 @@
+<?php
+defined('BASEPATH') OR exit('No direct script access allowed');
+
+class CustomerMap extends CI_Controller {
+
+    // method ที่ไม่ต้อง login (public access)
+    private $public_methods = ['public_index', 'api_markers', 'api_techs'];
+
+    public function __construct() {
+        parent::__construct();
+        $method = $this->router->fetch_method();
+        if (!in_array($method, $this->public_methods) && !$this->session->userdata('logged_in')) {
+            redirect('login');
+        }
+    }
+
+    // หน้าสำหรับ admin (ต้อง login, มี header/footer)
+    public function index() {
+        $data['title']   = 'แผนที่ลูกค้า';
+        $data['page_js'] = ['customer_map'];
+        $this->load->view('templates/header', $data);
+        $this->load->view('customer_map/index', $data);
+        $this->load->view('templates/footer');
+    }
+
+    // หน้า public (ไม่ต้อง login, ไม่มี header/footer)
+    public function public_index() {
+        $data['title'] = 'แผนที่ลูกค้า';
+        $this->load->view('customer_map/public', $data);
+    }
+
+    // API: markers
+    public function api_markers() {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $q      = trim($this->input->get('q',      TRUE) ?? '');
+        $filter = trim($this->input->get('filter',  TRUE) ?? 'all'); // all|green|yellow|red|overdue
+        $tech   = trim($this->input->get('tech',    TRUE) ?? '');
+        $today  = date('Y-m-d');
+
+        // ── ดึง "วันที่เปลี่ยนไส้กรองล่าสุด" ต่อลูกค้า (customer_name) ──
+        // ถ้ามี job_type='เปลี่ยนไส้กรอง' ใช้ start_time ล่าสุดของ row นั้น
+        // ถ้าไม่มี ใช้ start_time ล่าสุดของงาน job_type='ติดตั้ง'
+        // จับกลุ่มด้วย customer_name
+
+        $sql_last_service = "
+            SELECT
+                base.customer_name,
+                COALESCE(
+                    MAX(CASE WHEN base.job_type = 'เปลี่ยนไส้กรอง' THEN DATE(base.start_time) END),
+                    MAX(CASE WHEN base.job_type = 'ติดตั้ง'         THEN DATE(base.start_time) END)
+                ) AS last_service_date
+            FROM service_jobs base
+            WHERE base.start_time IS NOT NULL
+              AND base.status = 'เสร็จแล้ว'
+            GROUP BY base.customer_name
+        ";
+
+        // ── ดึง job ตัวแทนต่อลูกค้า (ใช้ job ที่ติดตั้งครั้งแรก เพื่อได้ location) ──
+        $sql = "
+            SELECT
+                sj.id,
+                sj.bill_no,
+                sj.customer_name,
+                sj.phone,
+                sj.address,
+                sj.location,
+                sj.map_link,
+                sj.install_date,
+                sj.purchase_date,
+                sj.product_service,
+                sj.job_type,
+                sj.technician,
+                sj.status,
+                sj.tech_zone,
+                sj.close_lat,
+                sj.close_lng,
+                sj.start_lat,
+                sj.start_lng,
+                ls.last_service_date,
+                DATEDIFF(CURDATE(), ls.last_service_date) AS days_since
+            FROM service_jobs sj
+            LEFT JOIN ({$sql_last_service}) ls ON ls.customer_name = sj.customer_name
+            WHERE (
+                (sj.close_lat IS NOT NULL AND sj.close_lat != '')
+                OR (sj.start_lat IS NOT NULL AND sj.start_lat != '')
+              )
+              AND sj.status NOT IN ('ยกเลิกนัด')
+              AND sj.job_type = 'ติดตั้ง'
+        ";
+
+        // ค้นหา
+        $binds = [];
+        if (!empty($q)) {
+            $sql .= " AND (sj.customer_name LIKE ? OR sj.bill_no LIKE ? OR sj.address LIKE ?)";
+            $binds[] = "%{$q}%";
+            $binds[] = "%{$q}%";
+            $binds[] = "%{$q}%";
+        }
+        if (!empty($tech)) {
+            $sql .= " AND sj.technician LIKE ?";
+            $binds[] = "%{$tech}%";
+        }
+
+        // ใช้ record เดียวต่อ customer_name (ตัวแทนที่มี location)
+        $sql .= " GROUP BY sj.customer_name ORDER BY sj.install_date DESC";
+
+        $query = $this->db->query($sql, $binds);
+        $rows  = $query->result_array();
+
+        $markers = [];
+        $counts  = ['all' => 0, 'green' => 0, 'yellow' => 0, 'red' => 0, 'overdue' => 0];
+
+        foreach ($rows as $r) {
+            // ใช้ close_lat/close_lng ก่อน ถ้าไม่มีใช้ start_lat/start_lng
+            if (!empty($r['close_lat']) && !empty($r['close_lng'])
+                && is_numeric(trim($r['close_lat'])) && is_numeric(trim($r['close_lng']))) {
+                $lat = (float)trim($r['close_lat']);
+                $lng = (float)trim($r['close_lng']);
+            } elseif (!empty($r['start_lat']) && !empty($r['start_lng'])
+                && is_numeric(trim($r['start_lat'])) && is_numeric(trim($r['start_lng']))) {
+                $lat = (float)trim($r['start_lat']);
+                $lng = (float)trim($r['start_lng']);
+            } else {
+                continue; // ไม่มีพิกัดเลย ข้ามไป
+            }
+
+            // คำนวณ marker_status
+            $days = (int)($r['days_since'] ?? -1);
+            if ($days < 0 || $r['last_service_date'] === null) {
+                $marker_status = 'green';
+                $label         = 'ติดตั้งแล้ว (ยังไม่มีข้อมูลบริการ)';
+            } elseif ($days < 180) {
+                $marker_status = 'green';
+                $label         = 'ติดตั้งแล้ว (ยังไม่ครบกำหนด)';
+            } elseif ($days < 365) {
+                $marker_status = 'yellow';
+                $label         = 'ใกล้ถึงกำหนดเปลี่ยน (ครบ 6 เดือน)';
+            } elseif ($days < 400) {
+                $marker_status = 'red';
+                $label         = 'ครบกำหนดเปลี่ยน (ครบ 1 ปี)';
+            } else {
+                $marker_status = 'overdue';
+                $label         = 'เกินกำหนด (เลยกำหนดแล้ว)';
+            }
+
+            $counts['all']++;
+            $counts[$marker_status]++;
+
+            // กรองตาม filter
+            if ($filter !== 'all' && $marker_status !== $filter) {
+                continue;
+            }
+
+            // คำนวณวันครบกำหนด
+            $base        = $r['last_service_date'] ?? $r['install_date'];
+            $due_6m      = $base ? date('d/m/Y', strtotime($base . ' +6 months'))  : '-';
+            $due_1y      = $base ? date('d/m/Y', strtotime($base . ' +12 months')) : '-';
+            $days_to_due = $base ? (int)ceil((strtotime($base . ' +12 months') - strtotime($today)) / 86400) : null;
+
+            $markers[] = [
+                'id'               => (int)$r['id'],
+                'bill_no'          => $r['bill_no'],
+                'customer_name'    => $r['customer_name'],
+                'phone'            => $r['phone'],
+                'address'          => $r['address'],
+                'map_link'         => $r['map_link'],
+                'lat'              => $lat,
+                'lng'              => $lng,
+                'install_date'     => $r['install_date'],
+                'last_service_date'=> $r['last_service_date'],
+                'product_service'  => $r['product_service'],
+                'job_type'         => $r['job_type'],
+                'technician'       => $r['technician'],
+                'status'           => $r['status'],
+                'tech_zone'        => $r['tech_zone'],
+                'marker_status'    => $marker_status,
+                'marker_label'     => $label,
+                'days_since'       => $days,
+                'days_to_due'      => $days_to_due,
+                'due_6m'           => $due_6m,
+                'due_1y'           => $due_1y,
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'data'    => $markers,
+            'counts'  => $counts,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    // API: technician list สำหรับ filter dropdown
+    public function api_techs() {
+        header('Content-Type: application/json; charset=utf-8');
+        $rows = $this->db
+            ->select('DISTINCT technician')
+            ->where('technician IS NOT NULL')
+            ->where('technician !=', '')
+            ->order_by('technician')
+            ->get('service_jobs')
+            ->result_array();
+        $techs = array_column($rows, 'technician');
+        echo json_encode(['success' => true, 'data' => $techs], JSON_UNESCAPED_UNICODE);
+    }
+}

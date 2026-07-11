@@ -37,6 +37,14 @@ $route['api/service/datatable']['POST'] = 'Api/datatable';
 
 
 // หน้าจัดการยานพาหนะ
+$route['customer_map']                    = 'CustomerMap/index';
+$route['customer_map/api_markers']        = 'CustomerMap/api_markers';
+$route['customer_map/api_techs']          = 'CustomerMap/api_techs';
+
+// ── Public map (ไม่ต้อง login) ─────────────────────────────
+$route['map']                             = 'CustomerMap/public_index';
+$route['map/api_markers']                 = 'CustomerMap/api_markers';   // reuse เดิม
+$route['map/api_techs']                   = 'CustomerMap/api_techs';     // reuse เดิม
 $route['vehicle']              = 'Vehicle/index';
 $route['api/vehicle']          = 'Vehicle/api_list';
 $route['api/vehicle/(:num)']   = 'Vehicle/api_get/$1';

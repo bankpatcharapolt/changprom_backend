@@ -59,6 +59,11 @@ var ASSET = '<?= base_url() ?>';
             <i class="bi bi-car-front-fill me-1"></i>ยานพาหนะ
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link <?= strpos(uri_string(),'customer_map')!==false?'active':'' ?>" href="<?= site_url('customer_map') ?>">
+            <i class="bi bi-pin-map-fill me-1"></i>แผนที่ลูกค้า
+          </a>
+        </li>
         <?php if ($this->session->userdata('role') === 'superadmin'): ?>
         <li class="nav-item">
           <a class="nav-link <?= strpos(uri_string(),'import')!==false?'active':'' ?>" href="<?= site_url('service/import') ?>">
