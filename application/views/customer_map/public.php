@@ -380,7 +380,8 @@ var API_MARKERS = '<?= site_url("map/api_markers") ?>';
 var API_TECHS    = '<?= site_url("map/api_techs") ?>';
 var API_HISTORY  = '<?= site_url("map/api_history") ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
-var GMAPS_KEY   = '';
+ var GMAPS_KEY   = '';
+//var GMAPS_KEY   = 'AIzaSyBiDeosZazrjT1PMnhs7TuKOpjJFDoGUJg';// prod
 
 function makeMarkerIcon(status) {
   var colors = {
