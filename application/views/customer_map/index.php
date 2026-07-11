@@ -8,6 +8,7 @@
   height: calc(100vh - 60px);
   position: relative;
   overflow: hidden;
+  overflow: clip; /* รองรับ Android 6+ ไม่ block touch events บน absolute children */
 }
 
 /* ═══════════════════════════════════════════════
@@ -15,7 +16,6 @@
 ═══════════════════════════════════════════════ */
 #stats-bar {
   display: flex;
-  gap: 8px;
   padding: 7px 12px;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
@@ -30,7 +30,6 @@
 .stat-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   padding: 5px 14px;
   border-radius: 20px;
   cursor: pointer;
@@ -40,7 +39,7 @@
   flex-shrink: 0;
 }
 .stat-chip.active { border-color: currentColor; }
-.stat-chip .chip-icon { font-size: .9rem; }
+.stat-chip .chip-icon { font-size: .9rem; margin-right: 6px; }
 .stat-chip .chip-lbl  { font-size: .8rem;  font-weight: 600; }
 .stat-chip .chip-num  { font-size: .8rem;  font-weight: 800; }
 
@@ -53,19 +52,19 @@
 /* Mobile: card ใหญ่ 5 คอลัมน์เท่ากัน */
 @media (max-width: 640px) {
   #stats-bar {
-    gap: 6px;
     padding: 8px 10px;
   }
+  #stats-bar .stat-chip { margin-right: 6px; }
+  #stats-bar .stat-chip:last-child { margin-right: 0; }
   .stat-chip {
     flex: 1;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
     padding: 8px 4px;
     border-radius: 12px;
     min-width: 0;
   }
-  .stat-chip .chip-icon { font-size: 1.1rem; }
+  .stat-chip .chip-icon { font-size: 1.1rem; margin-bottom: 2px; }
   .stat-chip .chip-num  { font-size: 1.3rem; font-weight: 800; line-height: 1; }
   .stat-chip .chip-lbl  { font-size: .6rem;  font-weight: 600; text-align: center; }
 }
@@ -76,14 +75,13 @@
 #map-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
   padding: 7px 12px;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
 }
-#search-box { flex: 1; min-width: 0; }
-#tech-filter { max-width: 150px; }
+#search-box { flex: 1; min-width: 0; margin-right: 8px; }
+#tech-filter { max-width: 150px; margin-right: 8px; }
 
 /* ═══════════════════════════════════════════════
    MAP BODY
@@ -98,12 +96,17 @@
 #info-panel {
   width: 320px;
   flex: 0 0 320px;
-  overflow-y: auto;
+  overflow-y: hidden;
   background: #fff;
   border-left: 1px solid #e5e7eb;
   display: none;
-  flex-direction: column;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  position: relative;
 }
+#info-panel.is-open { display: -webkit-box; display: -ms-flexbox; display: flex; }
 
 /* ═══════════════════════════════════════════════
    INFO PANEL — MOBILE (bottom sheet)
@@ -115,13 +118,25 @@
     position: absolute;
     bottom: 0; left: 0; right: 0;
     width: 100%;
-    flex: none;
-    max-height: 58vh;
+    -ms-flex: none;
+        flex: none;
+    height: 72vh;
+    max-height: 72vh;
     border-left: none;
     border-top: 1px solid #e5e7eb;
     border-radius: 18px 18px 0 0;
     box-shadow: 0 -4px 24px rgba(0,0,0,.15);
     z-index: 10;
+    display: none;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+            flex-direction: column;
+  }
+  #info-panel.is-open {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
   }
   #info-panel::before {
     content: '';
@@ -130,6 +145,8 @@
     background: #d1d5db;
     border-radius: 2px;
     margin: 10px auto 2px;
+    -ms-flex-negative: 0;
+        flex-shrink: 0;
   }
   #tech-filter { display: none; }
 }
@@ -140,13 +157,38 @@
 .ip-header {
   padding: 10px 16px 8px;
   border-bottom: 1px solid #f3f4f6;
+  display: -webkit-box;
+  display: -ms-flexbox;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
+  -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+          justify-content: space-between;
+  -webkit-box-align: start;
+      -ms-flex-align: start;
+          align-items: flex-start;
+  -ms-flex-negative: 0;
+      flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.ip-header > div { margin-right: 8px; }
+/* ปุ่มปิด — absolute เพื่อไม่ถูก overflow บัง */
+#info-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 100;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 8px;
+  background: rgba(255,255,255,.9);
+  border-radius: 50%;
+  border: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .ip-name { font-weight: 700; font-size: 1rem; line-height: 1.3; }
-.ip-body { padding: 10px 16px 16px; }
+.ip-body { padding: 10px 16px 0; flex: 1; overflow-y: auto; min-height: 0; }
+.ip-actions-wrap { padding: 10px 16px 14px; flex-shrink: 0; border-top: 1px solid #f3f4f6; }
 
 .status-pill {
   display: inline-block;
@@ -167,8 +209,8 @@
   align-items: baseline;
   padding: 5px 0;
   border-bottom: 1px solid #f9fafb;
-  gap: 8px;
 }
+.ip-lbl { margin-right: 8px; }
 .ip-lbl { font-size: .75rem; color: #6b7280; white-space: nowrap; flex-shrink: 0; }
 .ip-val { font-size: .85rem; font-weight: 500; text-align: right; word-break: break-word; }
 
@@ -177,26 +219,35 @@
 .days-due  { color: #dc2626; font-weight: 700; }
 .days-over { color: #7c3aed; font-weight: 700; }
 
-.ip-actions {
+.ip-actions { display: flex; margin-bottom: 8px; }
+.ip-actions > * + * { margin-left: 8px; }
+
+/* base style ปุ่มทุกตัว */
+.ip-btn {
+  display: -webkit-box;
+  display: -ms-flexbox;
   display: flex;
-  gap: 8px;
-  margin-top: 14px;
-}
-.ip-actions a {
-  flex: 1;
-  text-align: center;
-  padding: 9px 6px;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  height: 42px;
   border-radius: 10px;
   font-size: .82rem;
   font-weight: 600;
   text-decoration: none;
-  transition: opacity .15s;
+  border: none;
+  cursor: pointer;
+  -webkit-box-sizing: border-box;
+          box-sizing: border-box;
+  white-space: nowrap;
 }
-.ip-actions a:hover { opacity: .85; }
-.btn-detail { background: #2563eb; color: #fff; }
-.btn-nav    { background: #16a34a; color: #fff; }
-.btn-call    { background: #f3f4f6; color: #374151; flex: 0 0 44px !important; }
-.btn-history { background: #7c3aed; color: #fff; }
+.btn-history { background: #7c3aed; color: #fff; width: 100%; margin-bottom: 8px; }
+.btn-detail  { background: #2563eb; color: #fff; -webkit-box-flex: 1; -ms-flex: 1; flex: 1; }
+.btn-nav     { background: #16a34a; color: #fff; -webkit-box-flex: 1; -ms-flex: 1; flex: 1; }
+.btn-call    { background: #f3f4f6; color: #374151; width: 44px; -ms-flex-negative: 0; flex-shrink: 0; }
 
 .hrow {
   border: 1px solid #e5e7eb;
@@ -209,8 +260,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
-  gap: 8px;
 }
+.hrow-top > * + * { margin-left: 8px; }
 .hrow-bill  { font-weight: 700; font-size: .88rem; }
 .hrow-type  { font-size: .72rem; background: #e0e7ff; color: #3730a3; border-radius: 10px; padding: 2px 8px; }
 .hrow-date  { font-size: .75rem; color: #6b7280; }
@@ -270,12 +321,13 @@
     <div id="map-wrap"><div id="map"></div></div>
 
     <div id="info-panel">
+      <!-- ปุ่มปิด absolute ไม่ถูก overflow บัง -->
+      <button id="info-close" aria-label="ปิด">✕</button>
       <div class="ip-header">
         <div>
           <div class="ip-name" id="info-name">-</div>
           <div id="info-status-pill"></div>
         </div>
-        <button class="btn-close mt-1 flex-shrink-0" id="info-close"></button>
       </div>
       <div class="ip-body">
         <div class="ip-row"><span class="ip-lbl">เลขที่บิล</span>      <span class="ip-val" id="info-bill">-</span></div>
@@ -287,18 +339,23 @@
         <div class="ip-row"><span class="ip-lbl">เวลาที่เหลือ</span>   <span class="ip-val" id="info-days-left">-</span></div>
         <div class="ip-row"><span class="ip-lbl">ช่าง</span>           <span class="ip-val" id="info-tech">-</span></div>
         <div class="ip-row"><span class="ip-lbl">ที่อยู่</span>        <span class="ip-val" id="info-address">-</span></div>
+      </div>
 
-        <div class="ip-actions" style="flex-wrap:wrap;">
-          <button id="btn-history" class="btn-history" style="flex:1 1 100%;padding:9px 6px;border:none;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;">
-            <i class="bi bi-clock-history me-1"></i>ประวัติการให้บริการ
-          </button>
-          <a id="btn-detail"   href="#" class="btn-detail">
-            <i class="bi bi-list-ul me-1"></i>ดูรายละเอียด
+      <!-- ปุ่มติดล่างเสมอ -->
+      <div class="ip-actions-wrap">
+        <!-- ปุ่มแถว 1: ประวัติ (เต็มความกว้าง) -->
+        <button id="btn-history" class="ip-btn btn-history">
+          <i class="bi bi-clock-history" style="margin-right:6px;"></i>ประวัติการให้บริการ
+        </button>
+        <!-- ปุ่มแถว 2: ดูรายละเอียด + นำทาง + โทร -->
+        <div class="ip-actions">
+          <a id="btn-detail"   href="#" class="ip-btn btn-detail">
+            <i class="bi bi-list-ul" style="margin-right:4px;"></i>ดูรายละเอียด
           </a>
-          <a id="btn-navigate" href="#" target="_blank" rel="noopener" class="btn-nav">
-            <i class="bi bi-navigation-fill me-1"></i>นำทาง
+          <a id="btn-navigate" href="#" target="_blank" rel="noopener" class="ip-btn btn-nav">
+            <i class="bi bi-navigation-fill" style="margin-right:4px;"></i>นำทาง
           </a>
-          <a id="btn-call" href="#" class="btn-call">
+          <a id="btn-call" href="#" class="ip-btn btn-call">
             <i class="bi bi-telephone-fill"></i>
           </a>
         </div>
@@ -368,7 +425,7 @@ function loadMarkers() {
 
   markers.forEach(function(m){ m.setMap(null); });
   markers = [];
-  document.getElementById('info-panel').style.display = 'none';
+  document.getElementById('info-panel').classList.remove('is-open');
 
   fetch(url).then(function(r){ return r.json(); }).then(function(res) {
     if (!res.success) return;
@@ -433,7 +490,7 @@ function showPanel(d) {
   document.getElementById('btn-detail').href   = SERVICE_URL + '?search=' + encodeURIComponent(d.bill_no);
   document.getElementById('btn-call').href     = d.phone ? 'tel:' + d.phone.replace(/[^0-9+]/g,'') : '#';
 
-  document.getElementById('info-panel').style.display = 'flex';
+  document.getElementById('info-panel').classList.add('is-open');
   if (window.innerWidth <= 640) map.panTo({ lat: d.lat, lng: d.lng });
 }
 
@@ -445,7 +502,7 @@ function fmtDate(str) {
 }
 
 document.getElementById('info-close').addEventListener('click', function() {
-  document.getElementById('info-panel').style.display = 'none';
+  document.getElementById('info-panel').classList.remove('is-open');
 });
 document.getElementById('search-box').addEventListener('input', function() {
   clearTimeout(searchTimeout); searchTimeout = setTimeout(loadMarkers, 400);
@@ -519,6 +576,15 @@ function openHistoryModal(name) {
   s.async = true; s.defer = true;
   document.head.appendChild(s);
 })();
+
+// scroll ลงล่างสุดเมื่อเปิดบน mobile
+if (window.innerWidth <= 640) {
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }, 300);
+  });
+}
 </script>
 
 <!-- ── Bootstrap History Modal ───────────────────────────── -->
