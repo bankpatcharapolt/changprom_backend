@@ -4,7 +4,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class CustomerMap extends CI_Controller {
 
     // method ที่ไม่ต้อง login (public access)
-    private $public_methods = ['public_index', 'api_markers', 'api_techs'];
+    private $public_methods = ['public_index', 'api_markers', 'api_techs', 'api_history'];
 
     public function __construct() {
         parent::__construct();
@@ -121,23 +121,58 @@ class CustomerMap extends CI_Controller {
                 continue; // ไม่มีพิกัดเลย ข้ามไป
             }
 
-            // คำนวณ marker_status
-            $days = (int)($r['days_since'] ?? -1);
-            if ($days < 0 || $r['last_service_date'] === null) {
+            // ── คำนวณครบกำหนด ──────────────────────────────────────
+            // กำหนดเปลี่ยนไส้กรองทุก 6 เดือน นับจาก last_service_date เสมอ
+            $base    = $r['last_service_date'] ?? $r['install_date'];
+            $ts_now  = strtotime($today);
+            $due_next = null;  // วันครบกำหนดถัดไป (Y-m-d)
+            $days_to_due = null;
+
+            if ($base) {
+                $ts_base = strtotime($base);
+
+                // หา "รอบแรกที่ครบกำหนด" (6 เดือนแรกหลัง last_service)
+                $ts_first_due = strtotime(date('Y-m-d', $ts_base) . ' +6 months');
+
+                if ($ts_now < $ts_first_due) {
+                    // ยังไม่ถึงรอบแรก → หาวันครบกำหนดถัดไป = $ts_first_due
+                    $due_next    = date('Y-m-d', $ts_first_due);
+                    $days_to_due = (int)ceil(($ts_first_due - $ts_now) / 86400);
+                    $overdue_days = 0;
+                } else {
+                    // เลยรอบแรกแล้ว → นับวันที่เลยกำหนดมาจากรอบแรก
+                    // หารอบที่เลยมาล่าสุด (รอบสุดท้ายที่ $ts_due <= $ts_now)
+                    $ts_due = $ts_first_due;
+                    $ts_last_missed = $ts_first_due;
+                    while ($ts_due <= $ts_now) {
+                        $ts_last_missed = $ts_due;
+                        $ts_due = strtotime(date('Y-m-d', $ts_due) . ' +6 months');
+                    }
+                    $due_next     = date('Y-m-d', $ts_last_missed); // รอบที่เลยมาล่าสุด
+                    $overdue_days = (int)floor(($ts_now - $ts_last_missed) / 86400);
+                    $days_to_due  = -$overdue_days; // ติดลบ = เลยกำหนดไปแล้ว
+                }
+            }
+
+            // days_since จาก last_service_date
+            $days = $base ? (int)floor(($ts_now - strtotime($base)) / 86400) : -1;
+
+            // marker_status
+            if ($days < 0 || $base === null) {
                 $marker_status = 'green';
                 $label         = 'ติดตั้งแล้ว (ยังไม่มีข้อมูลบริการ)';
-            } elseif ($days < 180) {
+            } elseif ($days_to_due !== null && $days_to_due > 60) {
                 $marker_status = 'green';
                 $label         = 'ติดตั้งแล้ว (ยังไม่ครบกำหนด)';
-            } elseif ($days < 365) {
+            } elseif ($days_to_due !== null && $days_to_due > 0) {
                 $marker_status = 'yellow';
-                $label         = 'ใกล้ถึงกำหนดเปลี่ยน (ครบ 6 เดือน)';
-            } elseif ($days < 400) {
+                $label         = 'ใกล้ถึงกำหนดเปลี่ยน (เหลืออีก ' . $days_to_due . ' วัน)';
+            } elseif ($days_to_due !== null && $days_to_due > -30) {
                 $marker_status = 'red';
-                $label         = 'ครบกำหนดเปลี่ยน (ครบ 1 ปี)';
+                $label         = 'ครบกำหนดเปลี่ยนแล้ว (เลยกำหนด ' . abs($days_to_due) . ' วัน)';
             } else {
                 $marker_status = 'overdue';
-                $label         = 'เกินกำหนด (เลยกำหนดแล้ว)';
+                $label         = 'เกินกำหนด (เลยกำหนด ' . abs($days_to_due) . ' วัน)';
             }
 
             $counts['all']++;
@@ -148,11 +183,9 @@ class CustomerMap extends CI_Controller {
                 continue;
             }
 
-            // คำนวณวันครบกำหนด
-            $base        = $r['last_service_date'] ?? $r['install_date'];
-            $due_6m      = $base ? date('d/m/Y', strtotime($base . ' +6 months'))  : '-';
-            $due_1y      = $base ? date('d/m/Y', strtotime($base . ' +12 months')) : '-';
-            $days_to_due = $base ? (int)ceil((strtotime($base . ' +12 months') - strtotime($today)) / 86400) : null;
+            // ส่งวันครบกำหนดถัดไปเป็น due_1y (ใช้ชื่อเดิมเพื่อไม่ต้องแก้ JS)
+            $due_6m = null;   // ไม่ได้ใช้แล้ว
+            $due_1y = $due_next;
 
             $markers[] = [
                 'id'               => (int)$r['id'],
@@ -189,11 +222,30 @@ class CustomerMap extends CI_Controller {
         }
     }
 
+    // API: ประวัติการให้บริการของลูกค้า (ค้นจาก customer_name)
+    public function api_history() {
+        header('Content-Type: application/json; charset=utf-8');
+        $name = trim($this->input->get('name', TRUE) ?? '');
+        if (empty($name)) {
+            echo json_encode(['success'=>false,'message'=>'ไม่ระบุชื่อลูกค้า'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $rows = $this->db
+            ->select('id, bill_no, job_type, install_date, start_time, status, product_service, technician, tech_note')
+            ->where('customer_name', $name)
+            ->order_by('install_date', 'DESC')
+            ->order_by('id', 'DESC')
+            ->get('service_jobs')
+            ->result_array();
+        echo json_encode(['success'=>true,'data'=>$rows], JSON_UNESCAPED_UNICODE);
+    }
+
     // API: technician list สำหรับ filter dropdown
     public function api_techs() {
         header('Content-Type: application/json; charset=utf-8');
         $rows = $this->db
-            ->select('DISTINCT technician')
+            ->distinct()
+            ->select('technician')
             ->where('technician IS NOT NULL')
             ->where('technician !=', '')
             ->order_by('technician')

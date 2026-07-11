@@ -40,6 +40,8 @@ $route['api/service/datatable']['POST'] = 'Api/datatable';
 $route['customer_map']                    = 'CustomerMap/index';
 $route['customer_map/api_markers']        = 'CustomerMap/api_markers';
 $route['customer_map/api_techs']          = 'CustomerMap/api_techs';
+$route['customer_map/api_history']        = 'CustomerMap/api_history';
+$route['map/api_history']                 = 'CustomerMap/api_history';
 
 // ── Public map (ไม่ต้อง login) ─────────────────────────────
 $route['map']                             = 'CustomerMap/public_index';

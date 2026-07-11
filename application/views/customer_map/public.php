@@ -206,7 +206,31 @@
 .ip-actions a:hover { opacity: .85; }
 .btn-detail { background: #2563eb; color: #fff; }
 .btn-nav    { background: #16a34a; color: #fff; }
-.btn-call   { background: #f3f4f6; color: #374151; flex: 0 0 44px !important; }
+.btn-call    { background: #f3f4f6; color: #374151; flex: 0 0 44px !important; }
+.btn-history { background: #7c3aed; color: #fff; }
+
+.hrow {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.hrow-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+.hrow-bill  { font-weight: 700; font-size: .88rem; }
+.hrow-type  { font-size: .72rem; background: #e0e7ff; color: #3730a3; border-radius: 10px; padding: 2px 8px; }
+.hrow-date  { font-size: .75rem; color: #6b7280; }
+.hrow-prod  { font-size: .8rem; color: #374151; margin-top: 2px; }
+.hrow-tech  { font-size: .75rem; color: #6b7280; margin-top: 2px; }
+.hrow-status { font-size: .72rem; border-radius: 10px; padding: 2px 8px; }
+.hs-done    { background: #d1fae5; color: #065f46; }
+.hs-pending { background: #fef9c3; color: #713f12; }
+.hs-other   { background: #f3f4f6; color: #374151; }
 </style>
 
 <div id="map-page">
@@ -270,12 +294,15 @@
         <div class="ip-row"><span class="ip-lbl">สินค้า</span>         <span class="ip-val" id="info-product">-</span></div>
         <div class="ip-row"><span class="ip-lbl">ติดตั้งวันที่</span>  <span class="ip-val" id="info-install">-</span></div>
         <div class="ip-row"><span class="ip-lbl">บริการล่าสุด</span>   <span class="ip-val" id="info-last-svc">-</span></div>
-        <div class="ip-row"><span class="ip-lbl">ครบกำหนดเปลี่ยน</span><span class="ip-val" id="info-due1y">-</span></div>
+        <div class="ip-row"><span class="ip-lbl">ครบกำหนดถัดไป</span><span class="ip-val" id="info-due1y">-</span></div>
         <div class="ip-row"><span class="ip-lbl">เวลาที่เหลือ</span>   <span class="ip-val" id="info-days-left">-</span></div>
         <div class="ip-row"><span class="ip-lbl">ช่าง</span>           <span class="ip-val" id="info-tech">-</span></div>
         <div class="ip-row"><span class="ip-lbl">ที่อยู่</span>        <span class="ip-val" id="info-address">-</span></div>
 
-        <div class="ip-actions">
+        <div class="ip-actions" style="flex-wrap:wrap;">
+          <button id="btn-history" class="btn-history" style="flex:1 1 100%;padding:9px 6px;border:none;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;">
+            <i class="bi bi-clock-history me-1"></i>ประวัติการให้บริการ
+          </button>
           <a id="btn-detail"   href="#" class="btn-detail">
             <i class="bi bi-list-ul me-1"></i>ดูรายละเอียด
           </a>
@@ -293,7 +320,8 @@
 
 <script>
 var API_MARKERS = '<?= site_url("map/api_markers") ?>';
-var API_TECHS   = '<?= site_url("map/api_techs") ?>';
+var API_TECHS    = '<?= site_url("map/api_techs") ?>';
+var API_HISTORY  = '<?= site_url("map/api_history") ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
 var GMAPS_KEY   = '';
 
@@ -387,23 +415,24 @@ function showPanel(d) {
   document.getElementById('info-status-pill').innerHTML =
     '<span class="status-pill ' + (pillCls[d.marker_status]||'sp-green') + '">' + d.marker_label + '</span>';
 
+  currentHistoryName = d.customer_name || '';
   document.getElementById('info-name').textContent    = d.customer_name   || '-';
   document.getElementById('info-bill').textContent    = d.bill_no         || '-';
   document.getElementById('info-phone').textContent   = d.phone           || '-';
   document.getElementById('info-product').textContent = d.product_service || '-';
   document.getElementById('info-install').textContent = fmtDate(d.install_date);
   document.getElementById('info-last-svc').textContent = d.last_service_date ? fmtDate(d.last_service_date) : 'ยังไม่มีข้อมูล';
-  document.getElementById('info-due1y').textContent   = d.due_1y  || '-';
+  document.getElementById('info-due1y').textContent   = d.due_1y  ? fmtDate(d.due_1y) : '-';
   document.getElementById('info-tech').textContent    = d.technician || '-';
   document.getElementById('info-address').textContent = d.address   || '-';
 
   var el = document.getElementById('info-days-left');
   if (d.days_to_due !== null && d.days_to_due !== undefined) {
-    var cls = d.days_to_due > 180 ? 'days-ok'
+    var cls = d.days_to_due > 60  ? 'days-ok'
             : d.days_to_due > 0   ? 'days-warn'
             : d.days_to_due > -30 ? 'days-due' : 'days-over';
     el.className = 'ip-val ' + cls;
-    el.textContent = d.days_to_due >= 0
+    el.textContent = d.days_to_due > 0
       ? 'อีก ' + d.days_to_due + ' วัน'
       : 'เลยกำหนด ' + Math.abs(d.days_to_due) + ' วัน';
   } else {
@@ -444,6 +473,56 @@ document.querySelectorAll('.stat-chip').forEach(function(chip) {
   });
 });
 
+/* ── History Modal ──────────────────────────────────────── */
+var currentHistoryName = '';
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('btn-history').addEventListener('click', function() {
+    if (!currentHistoryName) return;
+    openHistoryModal(currentHistoryName);
+  });
+});
+
+function openHistoryModal(name) {
+  currentHistoryName = name;
+  document.getElementById('hm-name').textContent = name;
+  document.getElementById('hm-list').innerHTML = '';
+  document.getElementById('hm-loading').style.display = 'block';
+  new bootstrap.Modal(document.getElementById('historyModal')).show();
+
+  fetch(API_HISTORY + '?name=' + encodeURIComponent(name))
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      document.getElementById('hm-loading').style.display = 'none';
+      if (!res.success || !res.data.length) {
+        document.getElementById('hm-list').innerHTML = '<div class="text-center text-muted py-3 small">ไม่พบประวัติการให้บริการ</div>';
+        return;
+      }
+      var html = '';
+      res.data.forEach(function(r) {
+        var statusCls = r.status === 'เสร็จแล้ว' ? 'hs-done'
+                      : (r.status === 'รอดำเนินการ' || r.status === 'ยืนยันแล้ว') ? 'hs-pending' : 'hs-other';
+        var dateStr = r.start_time ? r.start_time.substr(0,10) : (r.install_date || '-');
+        html += '<div class="hrow">'
+          + '<div class="hrow-top">'
+          + '<span class="hrow-bill">' + (r.bill_no || '#'+r.id) + '</span>'
+          + '<span class="d-flex gap-1"><span class="hrow-type">' + (r.job_type || '-') + '</span><span class="hrow-status ' + statusCls + '">' + (r.status || '-') + '</span></span>'
+          + '</div>'
+          + '<div class="hrow-date"><i class="bi bi-calendar3 me-1"></i>' + dateStr + '</div>'
+          + (r.product_service ? '<div class="hrow-prod">' + r.product_service + '</div>' : '')
+          + (r.technician ? '<div class="hrow-tech"><i class="bi bi-tools me-1"></i>' + r.technician + '</div>' : '')
+          + '</div>';
+      });
+      document.getElementById('hm-list').innerHTML = html;
+    })
+    .catch(function() {
+      document.getElementById('hm-loading').style.display = 'none';
+      document.getElementById('hm-list').innerHTML = '<div class="text-center text-danger py-3 small">โหลดข้อมูลไม่สำเร็จ</div>';
+    });
+}
+
+/* ── เก็บ customer_name ตอน showPanel ─────────────────── */
+
 (function() {
   var s = document.createElement('script');
   var k = GMAPS_KEY ? ('key=' + GMAPS_KEY + '&') : '';
@@ -452,6 +531,27 @@ document.querySelectorAll('.stat-chip').forEach(function(chip) {
   document.head.appendChild(s);
 })();
 </script>
+
+<!-- ── Bootstrap History Modal ───────────────────────────── -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0">ประวัติการให้บริการ</h5>
+          <small id="hm-name" class="text-muted"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="hm-loading" class="text-center py-4 text-muted small">
+          <div class="spinner-border spinner-border-sm me-2"></div>กำลังโหลด...
+        </div>
+        <div id="hm-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
