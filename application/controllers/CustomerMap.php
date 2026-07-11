@@ -16,8 +16,7 @@ class CustomerMap extends CI_Controller {
 
     // หน้าสำหรับ admin (ต้อง login, มี header/footer)
     public function index() {
-        $data['title']   = 'แผนที่ลูกค้า';
-        $data['page_js'] = ['customer_map'];
+        $data['title'] = 'แผนที่ลูกค้า';
         $this->load->view('templates/header', $data);
         $this->load->view('customer_map/index', $data);
         $this->load->view('templates/footer');
@@ -32,6 +31,7 @@ class CustomerMap extends CI_Controller {
     // API: markers
     public function api_markers() {
         header('Content-Type: application/json; charset=utf-8');
+        try {
 
         $q      = trim($this->input->get('q',      TRUE) ?? '');
         $filter = trim($this->input->get('filter',  TRUE) ?? 'all'); // all|green|yellow|red|overdue
@@ -48,11 +48,11 @@ class CustomerMap extends CI_Controller {
                 base.customer_name,
                 COALESCE(
                     MAX(CASE WHEN base.job_type = 'เปลี่ยนไส้กรอง' THEN DATE(base.start_time) END),
-                    MAX(CASE WHEN base.job_type = 'ติดตั้ง'         THEN DATE(base.start_time) END)
+                    MAX(CASE WHEN base.job_type = 'ติดตั้ง'         THEN DATE(base.start_time) END),
+                    MAX(DATE(base.start_time))
                 ) AS last_service_date
             FROM service_jobs base
             WHERE base.start_time IS NOT NULL
-              AND base.status = 'เสร็จแล้ว'
             GROUP BY base.customer_name
         ";
 
@@ -188,6 +188,9 @@ class CustomerMap extends CI_Controller {
             'data'    => $markers,
             'counts'  => $counts,
         ], JSON_UNESCAPED_UNICODE);
+        } catch (Exception $e) {
+            echo json_encode(['success'=>false,'message'=>$e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
     }
 
     // API: technician list สำหรับ filter dropdown
