@@ -15,7 +15,7 @@ var statusColor = {
 var fields = [
   'job_type','bill_no','customer_name','purchase_date','address','location',
   'install_date','install_time','phone','technician','tech_note','status',
-  'product_service','bill_note','tags','sale_code','team','branch'
+  'product_service','bill_note','tags','sale_code','team','branch','branch_id'
 ];
 
 var serviceTable = null;
@@ -144,8 +144,14 @@ window.editRecord = function(id) {
       var v = d[f] || '';
       if (f === 'purchase_date' || f === 'install_date') v = v ? v.substr(0,10) : '';
       if (f === 'install_time') v = v ? v.substr(0,5) : '';
+      if (f === 'branch_id') return; // จัดการแยก
       $('#f_' + f).val(v);
     });
+    // set TomSelect branch_id
+    if (window.branchTomSelect) {
+      window.branchTomSelect.clear(true);
+      if (d.branch_id) window.branchTomSelect.setValue(String(d.branch_id));
+    }
     $('#modalTitle').html('<i class="bi bi-pencil-square me-2"></i>แก้ไขรายการ #' + d.id);
     new bootstrap.Modal(document.getElementById('serviceModal')).show();
   });
@@ -255,6 +261,7 @@ $(document).ready(function() {
       { data:'status', render: statusBadge },
       { data:'product_service', defaultContent:'-', render: function(d){ return d && d.length > 30 ? d.substr(0,30) + '…' : (d||'-'); } },
       { data:'tags', defaultContent:'-', render: tagsHtml },
+      { data:'branch_name', orderable:false, defaultContent:'-' },
       { data:'id', orderable:false, className:'text-center', render: function(id) {
         return '<div class="btn-group btn-group-sm">'
           + '<button class="btn btn-outline-info btn-sm" onclick="viewRecord(' + id + ')"><i class="bi bi-eye"></i></button>'
@@ -316,6 +323,31 @@ $(document).ready(function() {
   });
 
   // ปุ่มบันทึกใน modal
+  // โหลดสาขาสำหรับ dropdown + TomSelect
+  $.get(BASE + 'api/branch/active', function(r) {
+    if (!r.success) return;
+    var sel = document.getElementById('f_branch_id');
+    r.data.forEach(function(b) {
+      var o = document.createElement('option');
+      o.value = b.id; o.textContent = b.name; sel.appendChild(o);
+    });
+    if (typeof TomSelect !== 'undefined' && !window.branchTomSelect) {
+      window.branchTomSelect = new TomSelect('#f_branch_id', {
+        placeholder: '-- เลือกสาขา --',
+        allowEmptyOption: true,
+        maxOptions: 300,
+        render: {
+          option: function(data, escape) {
+            return '<div>' + escape(data.text) + '</div>';
+          },
+          item: function(data, escape) {
+            return '<div>' + escape(data.text) + '</div>';
+          }
+        }
+      });
+    }
+  });
+
   $('#saveBtn').on('click', function() { saveRecord(false); });
 
   // ปุ่มยืนยันบันทึกเมื่อชนเวลา

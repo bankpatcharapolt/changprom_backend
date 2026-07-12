@@ -96,10 +96,11 @@ class CustomerMap extends CI_Controller {
             $binds[] = "%{$tech}%";
         }
 
-        // subquery 1: หา job ที่มีพิกัดล่าสุด (any job_type) ต่อลูกค้า → เพื่อเอาพิกัด
-        $sql_loc = "
+        // subquery 1a: หา job ที่มีพิกัดจริง (close/start lat) ต่อลูกค้า
+        $sql_loc_gps = "
             SELECT sj2.customer_name,
-                   MAX(sj2.id) AS loc_job_id
+                   MAX(sj2.id) AS loc_job_id,
+                   'gps' AS loc_source
             FROM service_jobs sj2
             WHERE (
                 (sj2.close_lat IS NOT NULL AND sj2.close_lat != '')
@@ -108,6 +109,27 @@ class CustomerMap extends CI_Controller {
               AND sj2.status NOT IN ('ยกเลิกนัด')
               {$where_extra}
             GROUP BY sj2.customer_name
+        ";
+
+        // subquery 1b: หา job ที่มี branch_id ที่มีพิกัด (fallback) ต่อลูกค้าที่ไม่มีพิกัด GPS
+        $sql_loc_branch = "
+            SELECT sj3.customer_name,
+                   MAX(sj3.id) AS loc_job_id,
+                   'branch' AS loc_source
+            FROM service_jobs sj3
+            INNER JOIN branches brb ON brb.id = sj3.branch_id
+                AND brb.lat IS NOT NULL AND brb.lng IS NOT NULL
+            WHERE sj3.status NOT IN ('ยกเลิกนัด')
+              {$where_extra}
+            GROUP BY sj3.customer_name
+        ";
+
+        // รวม GPS + Branch fallback (UNION แบบ GPS ก่อน)
+        $sql_loc = "
+            SELECT customer_name, loc_job_id FROM ({$sql_loc_gps}) gps_tbl
+            UNION
+            SELECT b.customer_name, b.loc_job_id FROM ({$sql_loc_branch}) b
+            WHERE b.customer_name NOT IN (SELECT customer_name FROM ({$sql_loc_gps}) gps_tbl2)
         ";
 
         // subquery 2: หา job ติดตั้งล่าสุด ต่อลูกค้า → เพื่อเอาข้อมูลสินค้า/ที่อยู่
@@ -138,6 +160,7 @@ class CustomerMap extends CI_Controller {
                 COALESCE(sj_install.tech_zone, sj_loc.tech_zone) AS tech_zone,
                 sj_loc.close_lat, sj_loc.close_lng,
                 sj_loc.start_lat, sj_loc.start_lng,
+                br_loc.lat AS branch_lat, br_loc.lng AS branch_lng,
                 ls.last_service_date,
                 ls.last_service_type,
                 la.last_any_type,
@@ -146,19 +169,21 @@ class CustomerMap extends CI_Controller {
             JOIN service_jobs sj_loc       ON sj_loc.id = loc_tbl.loc_job_id
             LEFT JOIN ({$sql_install}) ins_tbl ON ins_tbl.customer_name = loc_tbl.customer_name
             LEFT JOIN service_jobs sj_install  ON sj_install.id = ins_tbl.install_job_id
+            LEFT JOIN branches br_loc              ON br_loc.id = sj_loc.branch_id
             LEFT JOIN ({$sql_last_service}) ls  ON ls.customer_name  = loc_tbl.customer_name
             LEFT JOIN ({$sql_last_any}) la             ON la.customer_name  = loc_tbl.customer_name
             ORDER BY install_date DESC
         ";
 
-        $query = $this->db->query($sql, $binds);
+        // binds: sql_loc_gps + sql_loc_branch + sql_loc_gps (ใน UNION subquery)
+        $query = $this->db->query($sql, array_merge($binds, $binds, $binds));
         $rows  = $query->result_array();
 
         $markers = [];
         $counts  = ['all' => 0, 'green' => 0, 'yellow' => 0, 'red' => 0, 'overdue' => 0];
 
         foreach ($rows as $r) {
-            // ใช้ close_lat/close_lng ก่อน ถ้าไม่มีใช้ start_lat/start_lng
+            // Priority: close_lat → start_lat → branch lat
             if (!empty($r['close_lat']) && !empty($r['close_lng'])
                 && is_numeric(trim($r['close_lat'])) && is_numeric(trim($r['close_lng']))) {
                 $lat = (float)trim($r['close_lat']);
@@ -167,6 +192,10 @@ class CustomerMap extends CI_Controller {
                 && is_numeric(trim($r['start_lat'])) && is_numeric(trim($r['start_lng']))) {
                 $lat = (float)trim($r['start_lat']);
                 $lng = (float)trim($r['start_lng']);
+            } elseif (!empty($r['branch_lat']) && !empty($r['branch_lng'])
+                && is_numeric($r['branch_lat']) && is_numeric($r['branch_lng'])) {
+                $lat = (float)$r['branch_lat'];
+                $lng = (float)$r['branch_lng'];
             } else {
                 continue; // ไม่มีพิกัดเลย ข้ามไป
             }

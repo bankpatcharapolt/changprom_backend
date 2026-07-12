@@ -60,6 +60,11 @@ var ASSET = '<?= base_url() ?>';
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link <?= strpos(uri_string(),'branch')!==false?'active':'' ?>" href="<?= site_url('branch') ?>">
+            <i class="bi bi-building me-1"></i>สาขา
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link <?= strpos(uri_string(),'customer_map')!==false?'active':'' ?>" href="<?= site_url('customer_map') ?>">
             <i class="bi bi-pin-map-fill me-1"></i>แผนที่ลูกค้า
           </a>

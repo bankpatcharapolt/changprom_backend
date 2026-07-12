@@ -61,13 +61,18 @@ class Service_model extends CI_Model {
     }
 
     public function datatable($start, $length, $search, $orderField, $orderDir) {
+        // LEFT JOIN branches เพื่อดึงชื่อสาขาจริง (branches.name) มาแสดงคู่กับ branch_id
+        $this->db->select('service_jobs.*, branches.name AS branch_name')
+                  ->join('branches', 'branches.id = service_jobs.branch_id', 'left');
         if ($search) {
             $this->db->group_start();
+            // ระบุ service_jobs. นำหน้าทุกคอลัมน์ กัน error ambiguous column
+            // เพราะ branches ก็มี phone/id/address/created_at/updated_at ซ้ำกับ service_jobs
             foreach (['bill_no','customer_name','phone','technician','product_service','tags','job_type','status','team','branch'] as $col)
-                $this->db->or_like($col, $search);
+                $this->db->or_like('service_jobs.'.$col, $search);
             $this->db->group_end();
         }
-        return $this->db->order_by($orderField,$orderDir)->limit($length,$start)->get($this->table)->result_array();
+        return $this->db->order_by('service_jobs.'.$orderField,$orderDir)->limit($length,$start)->get($this->table)->result_array();
     }
 
     public function count_all($search='') {

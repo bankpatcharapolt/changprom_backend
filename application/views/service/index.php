@@ -7,6 +7,8 @@ $jobTypes   = ['ติดตั้ง','ซ่อม','ล้างเครื�
 .table td { font-size:.83rem; }
 .badge { font-size:.71rem; }
 </style>
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
@@ -46,7 +48,7 @@ $jobTypes   = ['ติดตั้ง','ซ่อม','ล้างเครื�
             <th>ประเภท</th><th>เลขที่บิล</th><th>ชื่อลูกค้า</th>
             <th>วันที่ซื้อ</th><th>วันที่นัด</th><th>เวลา</th>
             <th>เบอร์โทร</th><th>ช่าง</th><th>สถานะ</th>
-            <th>สินค้า/บริการ</th><th>แท็ก</th>
+            <th>สินค้า/บริการ</th><th>แท็ก</th><th>สาขา</th>
             <th class="text-center">จัดการ</th>
           </tr>
         </thead>
@@ -143,8 +145,14 @@ $jobTypes   = ['ติดตั้ง','ซ่อม','ล้างเครื�
             <input type="text" id="f_team" class="form-control">
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-medium">สาขา</label>
-            <input type="text" id="f_branch" class="form-control">
+            <label class="form-label fw-medium">สาขา
+              <small class="text-muted fw-normal">(ชื่อจาก Excel อยู่ในช่องด้านล่าง)</small>
+            </label>
+            <select id="f_branch_id" class="form-select">
+              <option value="">-- เลือกสาขา --</option>
+            </select>
+            <input type="text" id="f_branch" class="form-control mt-1"
+                   placeholder="ชื่อสาขา (จาก Excel)" style="font-size:.82rem; color:#6b7280;">
           </div>
           <div class="col-md-6">
             <label class="form-label fw-medium">หมายเหตุช่าง</label>

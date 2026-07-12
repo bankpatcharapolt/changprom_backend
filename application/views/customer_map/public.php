@@ -6,8 +6,6 @@
   <title>แผนที่ลูกค้า</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>html,body{margin:0;padding:0;height:100%;font-family:"Sarabun",sans-serif;}#map-page{height:100vh;}</style>
 </head>
 <body>
@@ -377,13 +375,19 @@
 .hrow-type  { font-size: .72rem; background: #e0e7ff; color: #3730a3; border-radius: 10px; padding: 2px 8px; }
 .hrow-date  { font-size: .75rem; color: #6b7280; }
 .hrow-prod  { font-size: .8rem; color: #374151; margin-top: 2px; }
-.hrow-tech  { font-size: .75rem; color: #6b7280; margin-top: 2px; }
+.hrow-tech  { font-size: .75rem; color: #6b7280; }
+.hrow-tech-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
 .hrow-status { font-size: .72rem; border-radius: 10px; padding: 2px 8px; }
 .hs-done    { background: #d1fae5; color: #065f46; }
 .hs-pending { background: #fef9c3; color: #713f12; }
 .hs-other   { background: #f3f4f6; color: #374151; }
-/* รองรับไอคอน Font Awesome ใน Dropdown */
 
+/* รองรับไอคอน Font Awesome ใน Dropdown */
+#jobtype-filter, 
+#jobtype-filter option {
+  font-family: "Font Awesome 6 Free", "Sarabun", sans-serif;
+  font-weight: 700; /* สำคัญมาก: Font Awesome แบบ Solid ต้องใช้ weight 900 */
+}
 </style>
 
 <div id="map-page">
@@ -499,12 +503,11 @@
 var API_MARKERS = '<?= site_url("map/api_markers") ?>';
 var API_TECHS     = '<?= site_url("map/api_techs") ?>';
 var API_HISTORY   = '<?= site_url("map/api_history") ?>';
-var API_JOB_TYPES = '<?= site_url("map/api_job_types") ?>';
+var API_JOB_TYPES   = '<?= site_url("map/api_job_types") ?>';
+var CHANGPROM_URL   = '<?= rtrim(str_replace("service_management", "", base_url()), "/") . "/changprom/queue/detail/" ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
  var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
 //var GMAPS_KEY   = 'AIzaSyBiDeosZazrjT1PMnhs7TuKOpjJFDoGUJg';// prod
-
-
 function makeMarkerIcon(status, lastServiceType) {
   var colors = {
     green:   { pin:'#16a34a', border:'#14532d' },
@@ -551,6 +554,10 @@ function makeMarkerIcon(status, lastServiceType) {
   };
 }
 // ฟังก์ชันดึงรหัส Unicode ของ Font Awesome 6 (Solid) ตามประเภทงาน
+
+
+var map, markers = [], currentFilter = 'all', searchTimeout;
+// ฟังก์ชันดึงรหัส Unicode ของ Font Awesome 6 (Solid) ตามประเภทงาน
 function getJobTypeIcon(jobType) {
   var icons = {
     'ติดตั้ง':        '\uf0ad', // fa-wrench (ประแจ)
@@ -562,8 +569,6 @@ function getJobTypeIcon(jobType) {
   };
   return icons[jobType] || '\uf013'; // default เป็นรูปฟันเฟือง fa-gear (\uf013)
 }
-var map, markers = [], currentFilter = 'all', searchTimeout;
-
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: { lat: 13.7563, lng: 100.5018 },
@@ -819,11 +824,14 @@ function openHistoryModal(name) {
         html += '<div class="hrow">'
           + '<div class="hrow-top">'
           + '<span class="hrow-bill">' + (r.bill_no || '#'+r.id) + '</span>'
-          + '<span class="d-flex gap-1"><span class="hrow-type">' + (r.job_type || '-') + '</span><span class="hrow-status ' + statusCls + '">' + (r.status || '-') + '</span></span>'
+          + '<span class="d-flex" style="gap:4px;"><span class="hrow-type">' + (r.job_type || '-') + '</span><span class="hrow-status ' + statusCls + '">' + (r.status || '-') + '</span></span>'
           + '</div>'
           + '<div class="hrow-date"><i class="bi bi-calendar3 me-1"></i>' + dateStr + '</div>'
           + (r.product_service ? '<div class="hrow-prod">' + r.product_service + '</div>' : '')
-          + (r.technician ? '<div class="hrow-tech"><i class="bi bi-tools me-1"></i>' + r.technician + '</div>' : '')
+          + '<div class="hrow-tech-row">'
+          + (r.technician ? '<span class="hrow-tech"><i class="bi bi-tools me-1"></i>' + r.technician + '</span>' : '<span></span>')
+          + '<a href="' + CHANGPROM_URL + r.id + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" style="font-size:.75rem;padding:3px 10px;flex-shrink:0;"><i class="bi bi-box-arrow-up-right me-1"></i>รายละเอียด</a>'
+          + '</div>'
           + '</div>';
       });
       document.getElementById('hm-list').innerHTML = html;
