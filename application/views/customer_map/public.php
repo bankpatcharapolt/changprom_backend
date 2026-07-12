@@ -84,15 +84,21 @@
    TOOLBAR
 ═══════════════════════════════════════════════ */
 #map-toolbar {
+  display: -webkit-box;
+  display: -ms-flexbox;
   display: flex;
-  align-items: center;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
   padding: 7px 12px;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
-  flex-shrink: 0;
+  -ms-flex-negative: 0;
+      flex-shrink: 0;
 }
-#search-box { flex: 1; min-width: 0; margin-right: 8px; }
-#tech-filter { max-width: 150px; margin-right: 8px; }
+#search-box { -webkit-box-flex: 1; -ms-flex: 1; flex: 1; min-width: 0; margin-right: 8px; }
+#tech-filter { width: 140px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
+#jobtype-filter { width: 130px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
 
 /* ═══════════════════════════════════════════════
    MAP BODY
@@ -234,6 +240,98 @@
 .ip-actions > * + * { margin-left: 8px; }
 
 /* base style ปุ่มทุกตัว */
+/* ── Zoom buttons + My Location ────────────────────────── */
+#map-wrap { position: relative; }
+#zoom-btns {
+  position: absolute;
+  bottom: 110px;
+  right: 10px;
+  z-index: 5;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+}
+.zoom-btn {
+  width: 39px;
+  height: 39px;
+  margin-bottom: 4px;
+  border: none;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+}
+.zoom-btn:hover { background: #f3f4f6; }
+#btn-my-location {
+  width: 39px;
+  height: 39px;
+  margin-bottom: 8px;
+  border: none;
+  border-radius: 6px;
+  background: #fff;
+  color: #2563eb;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+}
+#btn-my-location:hover { background: #eff6ff; }
+#btn-my-location.locating { color: #2563eb; }
+#btn-my-location.locating i {
+  display: inline-block;
+  -webkit-animation: spin 1s linear infinite;
+          animation: spin 1s linear infinite;
+}
+@-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
+@keyframes spin        { to { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
+@media (max-width: 640px) {
+  /* บน mobile ใช้ position:fixed เพื่อไม่ให้ทะลุออกนอก map */
+  #zoom-btns {
+    position: fixed;
+    bottom: 80px;
+    right: 10px;
+    z-index: 20;
+    -webkit-transition: opacity .2s, visibility .2s;
+            transition: opacity .2s, visibility .2s;
+  }
+  /* ซ่อนปุ่ม zoom เมื่อ info panel เปิดอยู่ */
+  #info-panel.is-open ~ * #zoom-btns,
+  body.panel-open #zoom-btns {
+    opacity: 0;
+    visibility: hidden;
+  }
+  #tech-filter { display: none; }
+  #jobtype-filter { width: auto; -webkit-box-flex: 1; -ms-flex: 1; flex: 1; }
+}
+
 .ip-btn {
   display: -webkit-box;
   display: -ms-flexbox;
@@ -322,14 +420,32 @@
     <select id="tech-filter" class="form-select form-select-sm">
       <option value="">-- ช่างทั้งหมด --</option>
     </select>
-    <button class="btn btn-sm btn-outline-secondary flex-shrink-0" id="btn-refresh">
+    <select id="jobtype-filter" class="form-select form-select-sm">
+      <option value="">-- ประเภทงาน --</option>
+    </select>
+    <button class="btn btn-sm btn-outline-secondary" style="-ms-flex-negative:0;flex-shrink:0;" id="btn-refresh">
       <i class="bi bi-arrow-clockwise"></i>
     </button>
   </div>
 
   <!-- Map + Panel -->
   <div id="map-body">
-    <div id="map-wrap"><div id="map"></div></div>
+    <div id="map-wrap">
+      <div id="map"></div>
+      <!-- Loading toast สำหรับ geolocation -->
+      <div id="loc-toast" style="display:none;position:absolute;top:10px;left:50%;-webkit-transform:translateX(-50%);transform:translateX(-50%);background:rgba(0,0,0,.72);color:#fff;padding:8px 18px;border-radius:20px;font-size:.8rem;z-index:20;white-space:nowrap;pointer-events:none;">
+        <span style="display:inline-block;-webkit-animation:spin 1s linear infinite;animation:spin 1s linear infinite;margin-right:6px;">⟳</span>กำลังดึงตำแหน่ง...
+      </div>
+      <!-- ปุ่ม Zoom Level -->
+      <div id="zoom-btns">
+        <button id="btn-my-location" title="ตำแหน่งปัจจุบัน">
+          <i class="bi bi-crosshair"></i>
+        </button>
+        <button class="zoom-btn" data-zoom="10" title="จังหวัด">จังหวัด</button>
+        <button class="zoom-btn" data-zoom="13" title="อำเภอ">อำเภอ</button>
+        <button class="zoom-btn" data-zoom="15" title="ตำบล">ตำบล</button>
+      </div>
+    </div>
 
     <div id="info-panel">
       <!-- ปุ่มปิด absolute ไม่ถูก overflow บัง -->
@@ -377,10 +493,11 @@
 
 <script>
 var API_MARKERS = '<?= site_url("map/api_markers") ?>';
-var API_TECHS    = '<?= site_url("map/api_techs") ?>';
-var API_HISTORY  = '<?= site_url("map/api_history") ?>';
+var API_TECHS     = '<?= site_url("map/api_techs") ?>';
+var API_HISTORY   = '<?= site_url("map/api_history") ?>';
+var API_JOB_TYPES = '<?= site_url("map/api_job_types") ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
- var GMAPS_KEY   = '';
+ var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
 //var GMAPS_KEY   = 'AIzaSyBiDeosZazrjT1PMnhs7TuKOpjJFDoGUJg';// prod
 
 function makeMarkerIcon(status) {
@@ -414,7 +531,12 @@ function initMap() {
     zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
   });
   loadTechs();
+  loadJobTypes();
   loadMarkers();
+
+  // auto-show ตำแหน่ง user หลัง map init เสร็จ
+  // goToLocation เป็น global function อยู่ใน scope เดียวกัน เรียกได้ทันที
+  goToLocation(10); // เปิดมาใหม่ zoom ระดับจังหวัด
 }
 
 function loadTechs() {
@@ -428,16 +550,30 @@ function loadTechs() {
   });
 }
 
+function loadJobTypes() {
+  fetch(API_JOB_TYPES).then(function(r){ return r.json(); }).then(function(res) {
+    if (!res.success) return;
+    var sel = document.getElementById('jobtype-filter');
+    res.data.forEach(function(t) {
+      var o = document.createElement('option');
+      o.value = t; o.textContent = t; sel.appendChild(o);
+    });
+  });
+}
+
 function loadMarkers() {
   var q    = document.getElementById('search-box').value.trim();
   var tech = document.getElementById('tech-filter').value;
+  var jobType = document.getElementById('jobtype-filter').value;
   var url  = API_MARKERS + '?filter=' + currentFilter
            + '&q=' + encodeURIComponent(q)
-           + '&tech=' + encodeURIComponent(tech);
+           + '&tech=' + encodeURIComponent(tech)
+           + '&job_type=' + encodeURIComponent(jobType);
 
   markers.forEach(function(m){ m.setMap(null); });
   markers = [];
   document.getElementById('info-panel').classList.remove('is-open');
+  document.body.classList.remove('panel-open');
 
   fetch(url).then(function(r){ return r.json(); }).then(function(res) {
     if (!res.success) return;
@@ -503,6 +639,7 @@ function showPanel(d) {
   document.getElementById('btn-call').href     = d.phone ? 'tel:' + d.phone.replace(/[^0-9+]/g,'') : '#';
 
   document.getElementById('info-panel').classList.add('is-open');
+  if (window.innerWidth <= 640) document.body.classList.add('panel-open');
   if (window.innerWidth <= 640) map.panTo({ lat: d.lat, lng: d.lng });
 }
 
@@ -515,12 +652,74 @@ function fmtDate(str) {
 
 document.getElementById('info-close').addEventListener('click', function() {
   document.getElementById('info-panel').classList.remove('is-open');
+  document.body.classList.remove('panel-open');
 });
 document.getElementById('search-box').addEventListener('input', function() {
   clearTimeout(searchTimeout); searchTimeout = setTimeout(loadMarkers, 400);
 });
 document.getElementById('tech-filter').addEventListener('change', loadMarkers);
+document.getElementById('jobtype-filter').addEventListener('change', loadMarkers);
 document.getElementById('btn-refresh').addEventListener('click', loadMarkers);
+
+// ── My Location helpers (global scope เพื่อให้ initMap เรียกได้) ──
+function showLocLoading() {
+  var t = document.getElementById('loc-toast');
+  var b = document.getElementById('btn-my-location');
+  if (t) t.style.display = 'block';
+  if (b) b.classList.add('locating');
+}
+function hideLocLoading() {
+  var t = document.getElementById('loc-toast');
+  var b = document.getElementById('btn-my-location');
+  if (t) t.style.display = 'none';
+  if (b) b.classList.remove('locating');
+}
+function goToLocation(zoomLevel) {
+  if (!navigator.geolocation) { alert('Browser ไม่รองรับ Geolocation'); return; }
+  showLocLoading();
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      hideLocLoading();
+      if (!map) return;
+      var latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      map.panTo(latlng);
+      map.setZoom(zoomLevel || 14);
+      if (window._myLocMarker) window._myLocMarker.setMap(null);
+      window._myLocMarker = new google.maps.Marker({
+        position: latlng,
+        map: map,
+        title: 'ตำแหน่งของคุณ',
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#2563eb',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 3,
+        }
+      });
+    },
+    function(err) {
+      hideLocLoading();
+      if (err.code !== 1) alert('ไม่สามารถดึงตำแหน่งได้: ' + err.message);
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// ── Zoom buttons + My Location button event ────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.zoom-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (map) map.setZoom(parseInt(btn.dataset.zoom));
+    });
+  });
+
+  var locBtn = document.getElementById('btn-my-location');
+  if (locBtn) {
+    locBtn.addEventListener('click', goToLocation);
+  }
+});
 
 document.querySelectorAll('.stat-chip').forEach(function(chip) {
   chip.addEventListener('click', function() {

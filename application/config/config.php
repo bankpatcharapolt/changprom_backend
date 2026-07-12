@@ -22,6 +22,9 @@ $config['cache_path'] = '';
 $config['error_views_path'] = '';
 $config['cache_query_string'] = FALSE;
 $config['encryption_key'] = 'YourSecretEncryptionKey1234567890Ab';
+
+// Google Maps API Key
+$config['gmaps_key'] = '';
 $config['sess_driver'] = 'database';
 $config['sess_cookie_name'] = 'ci_session';
 $config['sess_expiration'] = 7200;

@@ -4,7 +4,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 class CustomerMap extends CI_Controller {
 
     // method ที่ไม่ต้อง login (public access)
-    private $public_methods = ['public_index', 'api_markers', 'api_techs', 'api_history'];
+    private $public_methods = ['public_index', 'api_markers', 'api_techs', 'api_history', 'api_job_types'];
 
     public function __construct() {
         parent::__construct();
@@ -16,7 +16,8 @@ class CustomerMap extends CI_Controller {
 
     // หน้าสำหรับ admin (ต้อง login, มี header/footer)
     public function index() {
-        $data['title'] = 'แผนที่ลูกค้า';
+        $data['title']     = 'แผนที่ลูกค้า';
+        $data['gmaps_key'] = $this->config->item('gmaps_key') ?? '';
         $this->load->view('templates/header', $data);
         $this->load->view('customer_map/index', $data);
         $this->load->view('templates/footer');
@@ -24,7 +25,8 @@ class CustomerMap extends CI_Controller {
 
     // หน้า public (ไม่ต้อง login, ไม่มี header/footer)
     public function public_index() {
-        $data['title'] = 'แผนที่ลูกค้า';
+        $data['title']     = 'แผนที่ลูกค้า';
+        $data['gmaps_key'] = $this->config->item('gmaps_key') ?? '';
         $this->load->view('customer_map/public', $data);
     }
 
@@ -33,10 +35,11 @@ class CustomerMap extends CI_Controller {
         header('Content-Type: application/json; charset=utf-8');
         try {
 
-        $q      = trim($this->input->get('q',      TRUE) ?? '');
-        $filter = trim($this->input->get('filter',  TRUE) ?? 'all'); // all|green|yellow|red|overdue
-        $tech   = trim($this->input->get('tech',    TRUE) ?? '');
-        $today  = date('Y-m-d');
+        $q        = trim($this->input->get('q',        TRUE) ?? '');
+        $filter   = trim($this->input->get('filter',    TRUE) ?? 'all');
+        $tech     = trim($this->input->get('tech',      TRUE) ?? '');
+        $job_type = trim($this->input->get('job_type',  TRUE) ?? '');
+        $today    = date('Y-m-d');
 
         // ── ดึง "วันที่เปลี่ยนไส้กรองล่าสุด" ต่อลูกค้า (customer_name) ──
         // ถ้ามี job_type='เปลี่ยนไส้กรอง' ใช้ start_time ล่าสุดของ row นั้น
@@ -50,7 +53,8 @@ class CustomerMap extends CI_Controller {
                     MAX(CASE WHEN base.job_type = 'เปลี่ยนไส้กรอง' THEN DATE(base.start_time) END),
                     MAX(CASE WHEN base.job_type = 'ติดตั้ง'         THEN DATE(base.start_time) END),
                     MAX(DATE(base.start_time))
-                ) AS last_service_date
+                ) AS last_service_date,
+                SUBSTRING_INDEX(GROUP_CONCAT(base.job_type ORDER BY base.start_time DESC SEPARATOR '|'), '|', 1) AS last_service_type
             FROM service_jobs base
             WHERE base.start_time IS NOT NULL
             GROUP BY base.customer_name
@@ -94,6 +98,7 @@ class CustomerMap extends CI_Controller {
                 sj.close_lat, sj.close_lng,
                 sj.start_lat, sj.start_lng,
                 ls.last_service_date,
+                ls.last_service_type,
                 DATEDIFF(CURDATE(), ls.last_service_date) AS days_since
             FROM service_jobs sj
             INNER JOIN ({$sql_representative}) rep ON rep.rep_id = sj.id
@@ -178,9 +183,16 @@ class CustomerMap extends CI_Controller {
             $counts['all']++;
             $counts[$marker_status]++;
 
-            // กรองตาม filter
+            // กรองตาม filter สี
             if ($filter !== 'all' && $marker_status !== $filter) {
                 continue;
+            }
+
+            // กรองตาม job_type (last_service_type)
+            if (!empty($job_type) && $job_type !== 'all') {
+                if (($r['last_service_type'] ?? '') !== $job_type) {
+                    continue;
+                }
             }
 
             // ส่งวันครบกำหนดถัดไปเป็น due_1y (ใช้ชื่อเดิมเพื่อไม่ต้องแก้ JS)
@@ -203,6 +215,7 @@ class CustomerMap extends CI_Controller {
                 'technician'       => $r['technician'],
                 'status'           => $r['status'],
                 'tech_zone'        => $r['tech_zone'],
+                'last_service_type'=> $r['last_service_type'] ?? '',
                 'marker_status'    => $marker_status,
                 'marker_label'     => $label,
                 'days_since'       => $days,
@@ -238,6 +251,24 @@ class CustomerMap extends CI_Controller {
             ->get('service_jobs')
             ->result_array();
         echo json_encode(['success'=>true,'data'=>$rows], JSON_UNESCAPED_UNICODE);
+    }
+
+    // API: job_types ที่มีจริงใน last_service ของแต่ละลูกค้า
+    public function api_job_types() {
+        header('Content-Type: application/json; charset=utf-8');
+        $sql = "
+            SELECT DISTINCT
+                SUBSTRING_INDEX(GROUP_CONCAT(job_type ORDER BY start_time DESC SEPARATOR '|'), '|', 1) AS last_type
+            FROM service_jobs
+            WHERE start_time IS NOT NULL
+            GROUP BY customer_name
+            HAVING last_type IS NOT NULL AND last_type != ''
+            ORDER BY last_type
+        ";
+        $rows = $this->db->query($sql)->result_array();
+        $types = array_values(array_unique(array_column($rows, 'last_type')));
+        sort($types);
+        echo json_encode(['success'=>true,'data'=>$types], JSON_UNESCAPED_UNICODE);
     }
 
     // API: technician list สำหรับ filter dropdown
