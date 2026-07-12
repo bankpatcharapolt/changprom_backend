@@ -46,22 +46,43 @@ class CustomerMap extends CI_Controller {
         // ถ้าไม่มี ใช้ start_time ล่าสุดของงาน job_type='ติดตั้ง'
         // จับกลุ่มด้วย customer_name
 
+        // last_service_date: นับเฉพาะ ติดตั้ง และ เปลี่ยนไส้กรอง (สำหรับคำนวณวันครบกำหนด)
+        // last_service_type: ประเภทล่าสุดใน 2 ประเภทนี้
         $sql_last_service = "
             SELECT
                 base.customer_name,
                 COALESCE(
                     MAX(CASE WHEN base.job_type = 'เปลี่ยนไส้กรอง' THEN DATE(base.start_time) END),
-                    MAX(CASE WHEN base.job_type = 'ติดตั้ง'         THEN DATE(base.start_time) END),
-                    MAX(DATE(base.start_time))
+                    MAX(CASE WHEN base.job_type = 'ติดตั้ง'         THEN DATE(base.start_time) END)
                 ) AS last_service_date,
-                SUBSTRING_INDEX(GROUP_CONCAT(base.job_type ORDER BY base.start_time DESC SEPARATOR '|'), '|', 1) AS last_service_type
+                CASE
+                    WHEN MAX(CASE WHEN base.job_type = 'เปลี่ยนไส้กรอง' THEN DATE(base.start_time) END) IS NOT NULL
+                     AND (
+                          MAX(CASE WHEN base.job_type = 'เปลี่ยนไส้กรอง' THEN DATE(base.start_time) END)
+                          >=
+                          COALESCE(MAX(CASE WHEN base.job_type = 'ติดตั้ง' THEN DATE(base.start_time) END), '1900-01-01')
+                         )
+                    THEN 'เปลี่ยนไส้กรอง'
+                    ELSE 'ติดตั้ง'
+                END AS last_service_type
+            FROM service_jobs base
+            WHERE base.start_time IS NOT NULL
+              AND base.job_type IN ('ติดตั้ง', 'เปลี่ยนไส้กรอง')
+            GROUP BY base.customer_name
+        ";
+
+        // last_any_type: job_type ล่าสุด (ทุกประเภท) ต่อลูกค้า — สำหรับ filter ประเภทอื่น
+        $sql_last_any = "
+            SELECT
+                base.customer_name,
+                SUBSTRING_INDEX(GROUP_CONCAT(base.job_type ORDER BY base.start_time DESC SEPARATOR '|'), '|', 1) AS last_any_type
             FROM service_jobs base
             WHERE base.start_time IS NOT NULL
             GROUP BY base.customer_name
         ";
 
-        // ── ดึง job id ตัวแทนต่อลูกค้า (job_type=ติดตั้ง ที่มีพิกัด ล่าสุด) ──
-        // ใช้ subquery หา id ก่อน แล้วค่อย JOIN เพื่อหลีกเลี่ยง ONLY_FULL_GROUP_BY
+        // ── ดึง job id ตัวแทนต่อลูกค้า (job ที่มีพิกัด ไม่จำกัด job_type) ──
+        // Logic: หา job ที่มีพิกัด ล่าสุดต่อลูกค้า 1 คน แล้วเอาพิกัดจากนั้น
         $where_extra = '';
         $binds = [];
         if (!empty($q)) {
@@ -75,35 +96,59 @@ class CustomerMap extends CI_Controller {
             $binds[] = "%{$tech}%";
         }
 
-        $sql_representative = "
-            SELECT MAX(sj2.id) AS rep_id
+        // subquery 1: หา job ที่มีพิกัดล่าสุด (any job_type) ต่อลูกค้า → เพื่อเอาพิกัด
+        $sql_loc = "
+            SELECT sj2.customer_name,
+                   MAX(sj2.id) AS loc_job_id
             FROM service_jobs sj2
             WHERE (
                 (sj2.close_lat IS NOT NULL AND sj2.close_lat != '')
                 OR (sj2.start_lat IS NOT NULL AND sj2.start_lat != '')
               )
               AND sj2.status NOT IN ('ยกเลิกนัด')
-              AND sj2.job_type = 'ติดตั้ง'
               {$where_extra}
             GROUP BY sj2.customer_name
         ";
 
+        // subquery 2: หา job ติดตั้งล่าสุด ต่อลูกค้า → เพื่อเอาข้อมูลสินค้า/ที่อยู่
+        $sql_install = "
+            SELECT sj3.customer_name,
+                   MAX(sj3.id) AS install_job_id
+            FROM service_jobs sj3
+            WHERE sj3.job_type = 'ติดตั้ง'
+              AND sj3.status NOT IN ('ยกเลิกนัด')
+            GROUP BY sj3.customer_name
+        ";
+
         $sql = "
             SELECT
-                sj.id, sj.bill_no, sj.customer_name, sj.phone,
-                sj.address, sj.location, sj.map_link,
-                sj.install_date, sj.purchase_date,
-                sj.product_service, sj.job_type,
-                sj.technician, sj.status, sj.tech_zone,
-                sj.close_lat, sj.close_lng,
-                sj.start_lat, sj.start_lng,
+                COALESCE(sj_install.id, sj_loc.id)           AS id,
+                COALESCE(sj_install.bill_no, sj_loc.bill_no) AS bill_no,
+                sj_loc.customer_name,
+                COALESCE(sj_install.phone, sj_loc.phone)     AS phone,
+                COALESCE(sj_install.address, sj_loc.address) AS address,
+                COALESCE(sj_install.location, sj_loc.location) AS location,
+                COALESCE(sj_install.map_link, sj_loc.map_link) AS map_link,
+                COALESCE(sj_install.install_date, sj_loc.install_date) AS install_date,
+                COALESCE(sj_install.purchase_date, sj_loc.purchase_date) AS purchase_date,
+                COALESCE(sj_install.product_service, sj_loc.product_service) AS product_service,
+                COALESCE(sj_install.job_type, sj_loc.job_type) AS job_type,
+                COALESCE(sj_install.technician, sj_loc.technician) AS technician,
+                COALESCE(sj_install.status, sj_loc.status)   AS status,
+                COALESCE(sj_install.tech_zone, sj_loc.tech_zone) AS tech_zone,
+                sj_loc.close_lat, sj_loc.close_lng,
+                sj_loc.start_lat, sj_loc.start_lng,
                 ls.last_service_date,
                 ls.last_service_type,
+                la.last_any_type,
                 DATEDIFF(CURDATE(), ls.last_service_date) AS days_since
-            FROM service_jobs sj
-            INNER JOIN ({$sql_representative}) rep ON rep.rep_id = sj.id
-            LEFT JOIN ({$sql_last_service}) ls ON ls.customer_name = sj.customer_name
-            ORDER BY sj.install_date DESC
+            FROM ({$sql_loc}) loc_tbl
+            JOIN service_jobs sj_loc       ON sj_loc.id = loc_tbl.loc_job_id
+            LEFT JOIN ({$sql_install}) ins_tbl ON ins_tbl.customer_name = loc_tbl.customer_name
+            LEFT JOIN service_jobs sj_install  ON sj_install.id = ins_tbl.install_job_id
+            LEFT JOIN ({$sql_last_service}) ls  ON ls.customer_name  = loc_tbl.customer_name
+            LEFT JOIN ({$sql_last_any}) la             ON la.customer_name  = loc_tbl.customer_name
+            ORDER BY install_date DESC
         ";
 
         $query = $this->db->query($sql, $binds);
@@ -188,10 +233,19 @@ class CustomerMap extends CI_Controller {
                 continue;
             }
 
-            // กรองตาม job_type (last_service_type)
+            // กรองตาม job_type
             if (!empty($job_type) && $job_type !== 'all') {
-                if (($r['last_service_type'] ?? '') !== $job_type) {
-                    continue;
+                $service_types = ['ติดตั้ง', 'เปลี่ยนไส้กรอง'];
+                if (in_array($job_type, $service_types)) {
+                    // ติดตั้ง/เปลี่ยนไส้กรอง → เทียบกับ last_service_type
+                    if (($r['last_service_type'] ?? '') !== $job_type) {
+                        continue;
+                    }
+                } else {
+                    // ประเภทอื่น → เทียบกับ last_any_type (job ล่าสุดทุกประเภท)
+                    if (($r['last_any_type'] ?? '') !== $job_type) {
+                        continue;
+                    }
                 }
             }
 
@@ -216,6 +270,7 @@ class CustomerMap extends CI_Controller {
                 'status'           => $r['status'],
                 'tech_zone'        => $r['tech_zone'],
                 'last_service_type'=> $r['last_service_type'] ?? '',
+                'last_any_type'    => $r['last_any_type']     ?? '',
                 'marker_status'    => $marker_status,
                 'marker_label'     => $label,
                 'days_since'       => $days,

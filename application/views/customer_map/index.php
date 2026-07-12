@@ -87,7 +87,7 @@
 }
 #search-box { -webkit-box-flex: 1; -ms-flex: 1; flex: 1; min-width: 0; margin-right: 8px; }
 #tech-filter { width: 140px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
-#jobtype-filter { width: 130px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
+#jobtype-filter { width: 180px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
 
 /* ═══════════════════════════════════════════════
    MAP BODY
@@ -369,6 +369,13 @@
 .hs-done    { background: #d1fae5; color: #065f46; }
 .hs-pending { background: #fef9c3; color: #713f12; }
 .hs-other   { background: #f3f4f6; color: #374151; }
+
+/* รองรับไอคอน Font Awesome ใน Dropdown */
+#jobtype-filter, 
+#jobtype-filter option {
+  font-family: "Font Awesome 6 Free", "Sarabun", sans-serif;
+  font-weight: 700; /* สำคัญมาก: Font Awesome แบบ Solid ต้องใช้ weight 900 */
+}
 </style>
 
 <div id="map-page">
@@ -382,7 +389,7 @@
     </div>
     <div class="stat-chip sc-green" data-f="green">
     
-      <span class="chip-lbl">ติดตั้งแล้ว</span>
+      <span class="chip-lbl">ยังไม่ครบกำหนด</span>
       <span class="chip-num" id="c-green">0</span>
     </div>
     <div class="stat-chip sc-yellow" data-f="yellow">
@@ -488,8 +495,7 @@ var API_JOB_TYPES = '<?= site_url("customer_map/api_job_types") ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
  var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
 //var GMAPS_KEY   = 'AIzaSyBiDeosZazrjT1PMnhs7TuKOpjJFDoGUJg';// prod
-
-function makeMarkerIcon(status) {
+function makeMarkerIcon(status, lastServiceType) {
   var colors = {
     green:   { pin:'#16a34a', border:'#14532d' },
     yellow:  { pin:'#eab308', border:'#92400e' },
@@ -497,19 +503,59 @@ function makeMarkerIcon(status) {
     overdue: { pin:'#7c3aed', border:'#4c1d95' },
   };
   var c = colors[status] || colors.green;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">'
-    + '<path d="M18 0C8 0 0 8 0 18c0 13 18 30 18 30S36 31 36 18C36 8 28 0 18 0z" fill="' + c.pin + '" stroke="' + c.border + '" stroke-width="1.5"/>'
-    + '<circle cx="18" cy="18" r="7" fill="#fff" opacity=".35"/>'
+
+  // SVG Path สำหรับไอคอนทั้ง 6 ประเภทงาน
+  var iconWrench = 'M10.9 2.1c-1.2.3-2.2 1-2.9 2L9.4 5.5 8 6.9 6.6 5.5C5.9 6.3 5.5 7.3 5.5 8.4c0 1.3.5 2.5 1.4 3.4l.6.6-5.9 5.9c-.6.6-.6 1.5 0 2.1.6.6 1.5.6 2.1 0l5.9-5.9.6.6c.9.9 2.1 1.4 3.4 1.4 1.1 0 2.1-.4 2.9-1.1L15.1 14l-1.4-1.4 1.4-1.4 1.4 1.4.4-.4c.5-.8.8-1.7.8-2.7 0-1.3-.5-2.5-1.4-3.4l-2.6 2.6-1.4-1.4 2.6-2.6c-.9-.6-2-.9-3.1-.6z'; // ติดตั้ง
+  var iconFilter = 'M1.5 1.5h17l-6.5 8v7l-4-2V9.5z'; // เปลี่ยนไส้กรอง
+  var iconTools  = 'M12.9 2c-1 0-2 .4-2.8 1.1L11.5 4.5 10 6 8.6 4.6C7.9 5.4 7.5 6.4 7.5 7.5c0 1 .4 2 1.1 2.7l.4.4L3.5 16c-.5.5-.5 1.4 0 1.9s1.4.5 1.9 0l5.5-5.5.4.4c.7.7 1.7 1.1 2.7 1.1s2-.4 2.7-1.1l-2.6-2.6 1.4-1.4 2.6 2.6c.7-.7 1.1-1.7 1.1-2.7 0-2.1-1.7-3.7-3.8-3.7z'; // ซ่อม
+  var iconClean  = 'M10 2C10 2 3 10.5 3 14c0 3.9 3.1 7 7 7s7-3.1 7-7C17 10.5 10 2 10 2zm0 12c-1.7 0-3-1.3-3-3 0-.6.4-1 1-1s1 .4 1 1c0 .6.4 1 1 1s1 .4 1 1-.4 1-1 1z'; // ล้างเครื่อง
+  var iconBox    = 'M10 1.5L2 6v9l8 4.5 8-4.5V6l-8-4.5zM10 3.3l5.8 3.2-5.8 3.3-5.8-3.3L10 3.3zM3.5 7.8l5.7 3.3v6.3l-5.7-3.2V7.8zm13 0v6.4l-5.8 3.2v-6.3l5.8-3.3z'; // ส่งสินค้า
+  var iconReturn = 'M8 3v3.5C13.5 6.5 18 10.5 18 16c0 1-.2 2-.5 2.8-.3.7-1.3.8-1.7.2-.5-.7-.4-1.7-.3-2.5 0-4-3-7.5-7.5-7.5V13L2 8l6-5z'; // นำสินค้ากลับ
+
+  var paths = {
+    'ติดตั้ง':        iconWrench,
+    'เปลี่ยนไส้กรอง': iconFilter,
+    'ซ่อม':           iconTools,
+    'ล้างเครื่อง':    iconClean,
+    'ส่งสินค้า':      iconBox,
+    'นำสินค้ากลับ':   iconReturn
+  };
+
+  // 1. แปลงเป็น String และตัดช่องว่าง (Space) หน้า-หลังทิ้ง ป้องกันปัญหา string ไม่ตรง
+  var cleanType = (lastServiceType || '').toString().trim();
+
+  // 2. ถ้าหาใน paths เจอ ให้ใช้ไอคอนนั้น ถ้าหาไม่เจอจริงๆ ถึงจะใช้ iconFilter เป็นค่าเริ่มต้น
+  var iconPath = paths[cleanType] || iconFilter;
+
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="50" viewBox="0 0 36 50">'
+    + '<path d="M18 0C8 0 0 8 0 18c0 13 18 32 18 32S36 31 36 18C36 8 28 0 18 0z" fill="' + c.pin + '" stroke="' + c.border + '" stroke-width="1.5"/>'
+    + '<g transform="translate(9,8) scale(0.9)">'
+    + '<path d="' + iconPath + '" fill="#ffffff"/>'
+    + '</g>'
     + '</svg>';
+
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    scaledSize: new google.maps.Size(36, 48),
-    anchor:     new google.maps.Point(18, 48),
+    scaledSize: new google.maps.Size(36, 50),
+    anchor:     new google.maps.Point(18, 50),
   };
 }
+// ฟังก์ชันดึงรหัส Unicode ของ Font Awesome 6 (Solid) ตามประเภทงาน
+
 
 var map, markers = [], currentFilter = 'all', searchTimeout;
-
+// ฟังก์ชันดึงรหัส Unicode ของ Font Awesome 6 (Solid) ตามประเภทงาน
+function getJobTypeIcon(jobType) {
+  var icons = {
+    'ติดตั้ง':        '\uf0ad', // fa-wrench (ประแจ)
+    'เปลี่ยนไส้กรอง': '\uf0b0', // fa-filter (กรอง)
+    'ซ่อม':           '\uf7d9', // fa-tools / fa-screwdriver-wrench (เครื่องมือซ่อม)
+    'ล้างเครื่อง':    '\uf51a', // fa-broom (ไม้กวาด/ทำความสะอาด)
+    'ส่งสินค้า':      '\uf466', // fa-box (กล่องพัสดุ)
+    'นำสินค้ากลับ':   '\uf3e5', // fa-rotate-left (นำกลับ/เทิร์น)
+  };
+  return icons[jobType] || '\uf013'; // default เป็นรูปฟันเฟือง fa-gear (\uf013)
+}
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: { lat: 13.7563, lng: 100.5018 },
@@ -538,18 +584,28 @@ function loadTechs() {
     });
   });
 }
-
 function loadJobTypes() {
+  // ก๊อปปี้ชุดนี้ไปเป๊ะๆ ครับ ผมใส่รหัสบังคับสีให้แล้ว และเปลี่ยนรูปลูกศรเทิร์นกลับที่ชอบมีปัญหาเป็นรูปอื่น
+  var typeIcon = {
+    'ติดตั้ง':        '🔧 ติดตั้ง',
+    'เปลี่ยนไส้กรอง': '💧 เปลี่ยนไส้กรอง',
+    'ซ่อม':           '🛠️ ซ่อม',       // เพิ่มรหัสบังคับสีให้ไม่ดำบน Windows
+    'ล้างเครื่อง':    '🧹 ล้างเครื่อง',
+    'ส่งสินค้า':      '📦 ส่งสินค้า',
+    'นำสินค้ากลับ':   '🔄 นำสินค้ากลับ', // เปลี่ยนมาใช้อันนี้ Windows จะเห็นเป็นสีชัวร์ๆ
+  };
+
   fetch(API_JOB_TYPES).then(function(r){ return r.json(); }).then(function(res) {
     if (!res.success) return;
     var sel = document.getElementById('jobtype-filter');
     res.data.forEach(function(t) {
       var o = document.createElement('option');
-      o.value = t; o.textContent = t; sel.appendChild(o);
+      o.value = t;
+      o.textContent = typeIcon[t] || t;
+      sel.appendChild(o);
     });
   });
 }
-
 function loadMarkers() {
   var q    = document.getElementById('search-box').value.trim();
   var tech = document.getElementById('tech-filter').value;
@@ -573,17 +629,17 @@ function loadMarkers() {
     document.getElementById('c-red').textContent    = cnt.red     || 0;
     document.getElementById('c-over').textContent   = cnt.overdue || 0;
 
-    res.data.forEach(function(d) {
+ res.data.forEach(function(d) {
       var m = new google.maps.Marker({
         position: { lat: d.lat, lng: d.lng },
         map: map,
-        icon: makeMarkerIcon(d.marker_status),
+        // เพิ่ม || d.job_type เพื่อป้องกันเคสที่ last_service_type เป็น null หรือค่าว่าง
+        icon: makeMarkerIcon(d.marker_status, d.last_service_type || d.job_type),
         title: d.customer_name,
       });
       m.addListener('click', function() { showPanel(d); });
       markers.push(m);
     });
-
     if (res.data.length > 0) {
       var bounds = new google.maps.LatLngBounds();
       res.data.forEach(function(d){ bounds.extend({ lat: d.lat, lng: d.lng }); });
@@ -647,7 +703,10 @@ document.getElementById('search-box').addEventListener('input', function() {
   clearTimeout(searchTimeout); searchTimeout = setTimeout(loadMarkers, 400);
 });
 document.getElementById('tech-filter').addEventListener('change', loadMarkers);
-document.getElementById('jobtype-filter').addEventListener('change', loadMarkers);
+document.getElementById('jobtype-filter').addEventListener('change', function() {
+  loadMarkers();
+  goToLocation(10);
+});
 document.getElementById('btn-refresh').addEventListener('click', loadMarkers);
 
 // ── My Location helpers (global scope เพื่อให้ initMap เรียกได้) ──
@@ -768,6 +827,14 @@ function openHistoryModal(name) {
 }
 
 /* ── เก็บ customer_name ตอน showPanel ─────────────────── */
+
+// โหลด Font Awesome 6 CDN
+(function() {
+  var fa = document.createElement('link');
+  fa.rel  = 'stylesheet';
+  fa.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css';
+  document.head.appendChild(fa);
+})();
 
 (function() {
   var s = document.createElement('script');
