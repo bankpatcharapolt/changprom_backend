@@ -48,6 +48,7 @@
 .stat-chip.sc-yellow { background:#fef9c3; color:#713f12; }
 .stat-chip.sc-red    { background:#fee2e2; color:#7f1d1d; }
 .stat-chip.sc-over   { background:#f3e8ff; color:#4c1d95; }
+.stat-chip.sc-pending { background:#dbeafe; color:#1e3a8a; }
 
 /* Mobile: card ใหญ่ 5 คอลัมน์เท่ากัน */
 @media (max-width: 640px) {
@@ -383,9 +384,17 @@
 
   <!-- Stats bar -->
   <div id="stats-bar">
+    <div class="stat-chip sc-pending" data-f="pending">
+     
+      <span class="chip-lbl">รอดำเนินการ</span>
+      <span class="chip-num" id="c-pending">0</span>
+ 
+      
+    </div>
+    |
     <div class="stat-chip sc-all active" data-f="all">
    
-      <span class="chip-lbl">ทั้งหมด</span>
+      <span class="chip-lbl">รวมทุกรายการ</span>
       <span class="chip-num" id="c-all">0</span>
     </div>
     <div class="stat-chip sc-green" data-f="green">
@@ -408,6 +417,7 @@
       <span class="chip-lbl">เกิน 1 ปี</span>
       <span class="chip-num" id="c-over">0</span>
     </div>
+    
   </div>
 
   <!-- Toolbar -->
@@ -630,6 +640,7 @@ function loadMarkers() {
     document.getElementById('c-yellow').textContent = cnt.yellow  || 0;
     document.getElementById('c-red').textContent    = cnt.red     || 0;
     document.getElementById('c-over').textContent   = cnt.overdue || 0;
+    document.getElementById('c-pending').textContent = cnt.pending || 0;
 
  res.data.forEach(function(d) {
       var m = new google.maps.Marker({

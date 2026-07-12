@@ -180,7 +180,8 @@ class CustomerMap extends CI_Controller {
         $rows  = $query->result_array();
 
         $markers = [];
-        $counts  = ['all' => 0, 'green' => 0, 'yellow' => 0, 'red' => 0, 'overdue' => 0];
+        $counts  = ['all' => 0, 'green' => 0, 'yellow' => 0, 'red' => 0, 'overdue' => 0, 'pending' => 0];
+        $branch_pin_seq = []; // นับลำดับ record ที่ตกพิกัดสาขาเดียวกัน เพื่อกระจายหมุดไม่ให้ทับกัน
 
         foreach ($rows as $r) {
             // Priority: close_lat → start_lat → branch lat
@@ -196,6 +197,18 @@ class CustomerMap extends CI_Controller {
                 && is_numeric($r['branch_lat']) && is_numeric($r['branch_lng'])) {
                 $lat = (float)$r['branch_lat'];
                 $lng = (float)$r['branch_lng'];
+
+                // กระจายหมุดที่ใช้พิกัดสาขาเดียวกันออกจากกัน (วงก้นหอย golden-angle)
+                // ตำแหน่งคงที่ทุกครั้งที่โหลด (deterministic ตามลำดับที่เจอ) ไม่ใช่สุ่มใหม่ทุกครั้ง
+                $bkey = $lat . ',' . $lng;
+                $idx  = $branch_pin_seq[$bkey] ?? 0;
+                $branch_pin_seq[$bkey] = $idx + 1;
+                if ($idx > 0) {
+                    $angle_rad  = deg2rad($idx * 137.508); // golden angle กระจายสม่ำเสมอแบบดอกทานตะวัน
+                    $radius_deg = 0.00015 * sqrt($idx);     // ขยายวงตามลำดับ ~16.7 เมตรต่อ sqrt(idx) (ปรับตัวเลขนี้ได้ถ้าอยากให้ห่าง/ชิดกว่านี้)
+                    $lat += $radius_deg * cos($angle_rad);
+                    $lng += $radius_deg * sin($angle_rad) / cos(deg2rad($lat));
+                }
             } else {
                 continue; // ไม่มีพิกัดเลย ข้ามไป
             }
@@ -256,9 +269,14 @@ class CustomerMap extends CI_Controller {
 
             $counts['all']++;
             $counts[$marker_status]++;
+            if ($r['status'] === 'รอดำเนินการ') {
+                $counts['pending']++;
+            }
 
-            // กรองตาม filter สี
-            if ($filter !== 'all' && $marker_status !== $filter) {
+            // กรองตาม filter สี (filter=pending คือกรองตามสถานะงานจริง แยกจากสีวันครบกำหนด)
+            if ($filter === 'pending') {
+                if ($r['status'] !== 'รอดำเนินการ') continue;
+            } elseif ($filter !== 'all' && $marker_status !== $filter) {
                 continue;
             }
 
