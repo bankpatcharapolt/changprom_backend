@@ -101,6 +101,19 @@
 #tech-filter { width: 140px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
 #jobtype-filter { width: 180px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
 
+/* Mobile: ค้นหาบรรทัดแรกเต็มความกว้าง, ช่าง+ประเภทงานแบ่งครึ่งบรรทัดสอง
+   (เดิมซ่อน #tech-filter ทิ้งบนมือถือ ทำให้กรองช่างไม่ได้เลย — แก้ด้วยการ wrap แทนการซ่อน) */
+@media (max-width: 640px) {
+  #map-toolbar { -ms-flex-wrap: wrap; flex-wrap: wrap; }
+  #search-box { -webkit-box-flex: 1; -ms-flex: 1 1 100%; flex: 1 1 100%; margin-right: 0; margin-bottom: 8px; }
+  #tech-filter, #jobtype-filter {
+    display: block;
+    width: auto;
+    -webkit-box-flex: 1; -ms-flex: 1 1 0; flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
 /* ═══════════════════════════════════════════════
    MAP BODY
 ═══════════════════════════════════════════════ */
@@ -166,7 +179,6 @@
     -ms-flex-negative: 0;
         flex-shrink: 0;
   }
-  #tech-filter { display: none; }
 }
 
 /* ═══════════════════════════════════════════════
@@ -329,8 +341,6 @@
     opacity: 0;
     visibility: hidden;
   }
-  #tech-filter { display: none; }
-  #jobtype-filter { width: auto; -webkit-box-flex: 1; -ms-flex: 1; flex: 1; }
 }
 
 .ip-btn {

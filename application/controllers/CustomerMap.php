@@ -113,15 +113,15 @@ class CustomerMap extends CI_Controller {
 
         // subquery 1b: หา job ที่มี branch_id ที่มีพิกัด (fallback) ต่อลูกค้าที่ไม่มีพิกัด GPS
         $sql_loc_branch = "
-            SELECT sj3.customer_name,
-                   MAX(sj3.id) AS loc_job_id,
+            SELECT sj2.customer_name,
+                   MAX(sj2.id) AS loc_job_id,
                    'branch' AS loc_source
-            FROM service_jobs sj3
-            INNER JOIN branches brb ON brb.id = sj3.branch_id
+            FROM service_jobs sj2
+            INNER JOIN branches brb ON brb.id = sj2.branch_id
                 AND brb.lat IS NOT NULL AND brb.lng IS NOT NULL
-            WHERE sj3.status NOT IN ('ยกเลิกนัด')
+            WHERE sj2.status NOT IN ('ยกเลิกนัด')
               {$where_extra}
-            GROUP BY sj3.customer_name
+            GROUP BY sj2.customer_name
         ";
 
         // รวม GPS + Branch fallback (UNION แบบ GPS ก่อน)
@@ -374,16 +374,25 @@ class CustomerMap extends CI_Controller {
     }
 
     // API: technician list สำหรับ filter dropdown
+    // เฉพาะช่างที่มีอย่างน้อย 1 งานที่หาพิกัดขึ้นแผนที่ได้จริง (GPS หรือ branch fallback)
+    // ให้ตรงกับ logic เดียวกับ api_markers() — กันไม่ให้ dropdown มีชื่อช่างที่กดแล้วไม่ขึ้นหมุดเลย
     public function api_techs() {
         header('Content-Type: application/json; charset=utf-8');
-        $rows = $this->db
-            ->distinct()
-            ->select('technician')
-            ->where('technician IS NOT NULL')
-            ->where('technician !=', '')
-            ->order_by('technician')
-            ->get('service_jobs')
-            ->result_array();
+        $sql = "
+            SELECT DISTINCT sj.technician
+            FROM service_jobs sj
+            LEFT JOIN branches br ON br.id = sj.branch_id
+            WHERE sj.technician IS NOT NULL
+              AND sj.technician != ''
+              AND sj.status NOT IN ('ยกเลิกนัด')
+              AND (
+                  (sj.close_lat IS NOT NULL AND sj.close_lat != '')
+                  OR (sj.start_lat IS NOT NULL AND sj.start_lat != '')
+                  OR (br.lat IS NOT NULL AND br.lng IS NOT NULL)
+              )
+            ORDER BY sj.technician
+        ";
+        $rows  = $this->db->query($sql)->result_array();
         $techs = array_column($rows, 'technician');
         echo json_encode(['success' => true, 'data' => $techs], JSON_UNESCAPED_UNICODE);
     }
