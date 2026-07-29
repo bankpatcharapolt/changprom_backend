@@ -25,7 +25,7 @@ var ASSET = '<?= base_url() ?>';
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="<?= site_url('dashboard') ?>">
+    <a class="navbar-brand fw-bold" href="<?= site_url($this->session->userdata('role') === 'employee' ? 'map' : 'dashboard') ?>">
       <i class="bi bi-tools me-2"></i>ระบบงานบริการ
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
@@ -33,6 +33,14 @@ var ASSET = '<?= base_url() ?>';
     </button>
     <div class="collapse navbar-collapse" id="navMain">
       <ul class="navbar-nav me-auto">
+        <?php if ($this->session->userdata('role') === 'employee'): ?>
+        <!-- พนักงานทั่วไป: เห็นเมนูเดียวคือแผนที่ลูกค้า (ชี้ไปที่ /map ซึ่งมีระบบสิทธิ์ของตัวเอง) -->
+        <li class="nav-item">
+          <a class="nav-link active" href="<?= site_url('map') ?>">
+            <i class="bi bi-pin-map-fill me-1"></i>แผนที่ลูกค้า
+          </a>
+        </li>
+        <?php else: ?>
         <li class="nav-item">
           <a class="nav-link <?= uri_string()=='dashboard'?'active':'' ?>" href="<?= site_url('dashboard') ?>">
             <i class="bi bi-speedometer2 me-1"></i>Dashboard
@@ -76,7 +84,14 @@ var ASSET = '<?= base_url() ?>';
           </a>
         </li>
         <?php endif; ?>
-     
+        <?php if (in_array($this->session->userdata('role'), ['superadmin', 'admin'])): ?>
+        <li class="nav-item">
+          <a class="nav-link <?= strpos(uri_string(),'employee')!==false?'active':'' ?>" href="<?= site_url('employee') ?>">
+            <i class="bi bi-person-badge-fill me-1"></i>จัดการพนักงาน
+          </a>
+        </li>
+        <?php endif; ?>
+        <?php endif; ?>
       </ul>
       <div class="d-flex align-items-center gap-3">
         <span class="text-white-50 small"><i class="bi bi-person-circle me-1"></i><?= $this->session->userdata('full_name') ?></span>

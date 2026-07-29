@@ -49,6 +49,7 @@ $route['map/api_job_types']              = 'CustomerMap/api_job_types';
 $route['map']                             = 'CustomerMap/public_index';
 $route['map/api_markers']                 = 'CustomerMap/api_markers';   // reuse เดิม
 $route['map/api_techs']                   = 'CustomerMap/api_techs';     // reuse เดิม
+$route['map/api_warranty_info']           = 'CustomerMap/api_warranty_info';
 $route['branch']                      = 'Branch/index';
 $route['api/branch']                  = 'Branch/api_list';
 $route['api/branch/active']           = 'Branch/api_active';
@@ -59,6 +60,21 @@ $route['api/branch/delete/(:num)']    = 'Branch/api_delete/$1';
 $route['vehicle']              = 'Vehicle/index';
 $route['api/vehicle']          = 'Vehicle/api_list';
 $route['api/vehicle/(:num)']   = 'Vehicle/api_get/$1';
+
+// หน้าจัดการพนักงาน
+$route['employee']                             = 'Employee/index';
+$route['api/employee']                         = 'Employee/api_list';
+$route['api/employee/datatable']               = 'Employee/api_datatable';
+$route['api/employee/create']                  = 'Employee/api_create';
+$route['api/employee/get/(:num)']              = 'Employee/api_get/$1';
+$route['api/employee/update/(:num)']           = 'Employee/api_update/$1';
+$route['api/employee/delete/(:num)']           = 'Employee/api_delete/$1';
+$route['api/employee/request_access']          = 'Employee/api_request_access';
+$route['api/employee/requests']                = 'Employee/api_requests';
+$route['api/employee/requests/approve/(:num)'] = 'Employee/api_approve_request/$1';
+$route['api/employee/requests/reject/(:num)']  = 'Employee/api_reject_request/$1';
+$route['api/employee/grant/(:num)']            = 'Employee/api_grant/$1';
+$route['api/employee/revoke/(:num)']           = 'Employee/api_revoke/$1';
 
 // หน้าจัดการช่าง
 $route['technician']                       = 'Technician/index';

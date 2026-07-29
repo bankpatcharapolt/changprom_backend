@@ -8,9 +8,11 @@ class Technician extends CI_Controller {
 
     public function __construct() {
         parent::__construct();
+        // หมายเหตุ: เดิมไฟล์นี้ไม่มีการเช็ค login เลย (คอมเมนต์ปิดไว้) เพิ่มให้ตรงกับ controller อื่นๆ ในระบบ
+        if (!$this->session->userdata('logged_in')) { redirect('login'); return; }
+        // พนักงานทั่วไปเห็นได้แค่หน้าแผนที่ลูกค้า ไม่มีสิทธิ์เข้าหน้านี้
+        if ($this->session->userdata('role') === 'employee') { redirect('map'); return; }
         $this->load->model('Technician_model', 'tech_model');
-        // ถ้ามีการ auth
-        // if (!$this->session->userdata('logged_in')) { redirect('login'); }
     }
 
     // ---- หน้า View ----

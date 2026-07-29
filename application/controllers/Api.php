@@ -10,7 +10,8 @@ class Api extends CI_Controller {
     }
 
     private function _check_auth() {
-        if (!$this->session->userdata('logged_in')) {
+        // พนักงานทั่วไปไม่มีสิทธิ์เข้าข้อมูลชุดนี้เลย (เหมือนกับที่ถูกกันไว้ที่หน้า /service)
+        if (!$this->session->userdata('logged_in') || $this->session->userdata('role') === 'employee') {
             http_response_code(401);
             echo json_encode(['success'=>false,'message'=>'Unauthorized']);
             exit;
@@ -78,6 +79,9 @@ class Api extends CI_Controller {
 
     public function delete_service($id) {
         $this->_check_auth();
+        if ($this->session->userdata('role') !== 'superadmin') {
+            $this->_response(['success'=>false,'message'=>'เฉพาะ superadmin เท่านั้นที่ลบข้อมูลได้'], 403); return;
+        }
         if (!$this->Service_model->get_by_id($id)) { $this->_response(['success'=>false,'message'=>'ไม่พบข้อมูล'],404); return; }
         $this->Service_model->delete($id);
         $this->_response(['success'=>true,'message'=>'ลบสำเร็จ']);

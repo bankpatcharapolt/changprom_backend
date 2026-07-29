@@ -12,14 +12,14 @@ class Auth extends CI_Controller {
 
     public function index() {
         if ($this->session->userdata('logged_in')) {
-            redirect('dashboard');
+            redirect($this->session->userdata('role') === 'employee' ? 'map' : 'dashboard');
         }
         redirect('login');
     }
 
     public function login() {
         if ($this->session->userdata('logged_in')) {
-            redirect('dashboard');
+            redirect($this->session->userdata('role') === 'employee' ? 'map' : 'dashboard');
         }
 
         if ($this->input->method() === 'post') {
@@ -35,7 +35,8 @@ class Auth extends CI_Controller {
                     'full_name'  => $user['full_name'],
                     'role'       => $user['role'],
                 ]);
-                redirect('dashboard');
+                // พนักงานทั่วไปเห็นได้แค่หน้าแผนที่ลูกค้า ไม่มีสิทธิ์เข้า dashboard
+                redirect($user['role'] === 'employee' ? 'map' : 'dashboard');
             } else {
                 // ลอง login ด้วยบัญชีช่าง (register table: reg_username / reg_pass)
                 $tech = $this->db->where('reg_username', $username)->get('register')->row_array();
@@ -60,7 +61,7 @@ class Auth extends CI_Controller {
 
     public function register() {
         if ($this->session->userdata('logged_in')) {
-            redirect('dashboard');
+            redirect($this->session->userdata('role') === 'employee' ? 'map' : 'dashboard');
         }
 
         if ($this->input->method() === 'post') {

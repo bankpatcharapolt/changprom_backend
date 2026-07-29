@@ -25,6 +25,16 @@ function statusBadge(s) {
   return '<span class="badge bg-' + cls + '">' + (s||'-') + '</span>';
 }
 
+// jQuery ส่งทุก response ที่ status ไม่ใช่ 2xx (400/409/401 ฯลฯ) เข้า error: เสมอ ไม่ว่า
+// body จะมีข้อความ error ชัดเจนแค่ไหน — ถ้าไม่ดึงจาก responseJSON ตรงๆ ผู้ใช้จะเห็นแต่
+// ข้อความทั่วไปแทนสาเหตุจริง (เช่น "เลขที่บิลซ้ำ")
+function ajaxErrMsg(jqXHR, fallback) {
+  if (jqXHR && jqXHR.responseJSON && jqXHR.responseJSON.message) {
+    return jqXHR.responseJSON.message;
+  }
+  return fallback || 'ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่อีกครั้ง';
+}
+
 // ---- Stats ----
 function loadStats() {
   $.get(BASE + 'api/service', function(r) {
@@ -174,7 +184,8 @@ window.deleteRecord = function(id) {
         } else {
           Swal.fire('ข้อผิดพลาด', r.message, 'error');
         }
-      }
+      },
+      error: function(jqXHR) { Swal.fire('ข้อผิดพลาด', ajaxErrMsg(jqXHR), 'error'); }
     });
   });
 };
@@ -222,7 +233,16 @@ function saveRecord(force) {
         Swal.fire('ข้อผิดพลาด', r.message, 'error');
       }
     },
-    error: function() { Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อได้', 'error'); },
+    error: function(jqXHR) {
+      var r = jqXHR && jqXHR.responseJSON;
+      if (r && r.conflict) {
+        $('#conflict-msg').text(r.message);
+        $('#conflict-alert').removeClass('d-none');
+        document.getElementById('conflict-alert').scrollIntoView({ behavior:'smooth' });
+      } else {
+        Swal.fire('ข้อผิดพลาด', ajaxErrMsg(jqXHR), 'error');
+      }
+    },
     complete: function() {
       $('#saveBtn').prop('disabled', false).html('<i class="bi bi-save me-2"></i>บันทึก');
     }
@@ -263,11 +283,12 @@ $(document).ready(function() {
       { data:'tags', defaultContent:'-', render: tagsHtml },
       { data:'branch_name', orderable:false, defaultContent:'-' },
       { data:'id', orderable:false, className:'text-center', render: function(id) {
-        return '<div class="btn-group btn-group-sm">'
-          + '<button class="btn btn-outline-info btn-sm" onclick="viewRecord(' + id + ')"><i class="bi bi-eye"></i></button>'
-          + '<button class="btn btn-outline-warning btn-sm" onclick="editRecord(' + id + ')"><i class="bi bi-pencil"></i></button>'
-          + '<button class="btn btn-outline-danger btn-sm" onclick="deleteRecord(' + id + ')"><i class="bi bi-trash"></i></button>'
-          + '</div>';
+        var btns = '<button class="btn btn-outline-info btn-sm" onclick="viewRecord(' + id + ')"><i class="bi bi-eye"></i></button>'
+          + '<button class="btn btn-outline-warning btn-sm" onclick="editRecord(' + id + ')"><i class="bi bi-pencil"></i></button>';
+        if (IS_SUPERADMIN) {
+          btns += '<button class="btn btn-outline-danger btn-sm" onclick="deleteRecord(' + id + ')"><i class="bi bi-trash"></i></button>';
+        }
+        return '<div class="btn-group btn-group-sm">' + btns + '</div>';
       }}
     ],
     language: { url: '//cdn.datatables.net/plug-ins/1.13.8/i18n/th.json' },

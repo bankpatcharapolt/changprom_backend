@@ -13,7 +13,7 @@ $config['composer_autoload'] = FALSE;
 $config['permitted_uri_chars'] = 'a-z 0-9~%.:_\-';
 $config['allow_get_array'] = TRUE;
 $config['enable_query_strings'] = FALSE;
-$config['log_threshold'] = 0;
+$config['log_threshold'] = 1;
 $config['log_path'] = '';
 $config['log_file_extension'] = '';
 $config['log_file_permissions'] = 0644;
@@ -22,6 +22,11 @@ $config['cache_path'] = '';
 $config['error_views_path'] = '';
 $config['cache_query_string'] = FALSE;
 $config['encryption_key'] = 'YourSecretEncryptionKey1234567890Ab';
+
+// ใช้เซ็นชื่อ/ตรวจ token สำหรับ embed แผนที่แบบไม่ต้อง login (จากหน้า
+// tgsmartlife.com/register-product) — ต้องเป็นค่าเดียวกันกับ $config['map_token_secret']
+// ในระบบ tgsmartlife (เว็บหลัก) ห้ามให้ค่าต่างกัน ไม่งั้น token ที่อีกฝั่งออกจะตรวจไม่ผ่าน
+$config['map_token_secret'] = '9b5bed1b8011ae01c8638425d8bef98f97319e47d31b520c1fcaa43985cd08fb';
 
 // Google Maps API Key
 $config['gmaps_key'] = '';

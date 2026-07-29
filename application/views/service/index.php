@@ -192,3 +192,7 @@ $jobTypes   = ['ติดตั้ง','ซ่อม','ล้างเครื�
     </div>
   </div>
 </div>
+
+<script>
+var IS_SUPERADMIN = <?= !empty($is_superadmin) ? 'true' : 'false' ?>;
+</script>

@@ -6,13 +6,16 @@ class Service extends CI_Controller {
     public function __construct() {
         parent::__construct();
         if (!$this->session->userdata('logged_in')) redirect('login');
+        // พนักงานทั่วไปเห็นได้แค่หน้าแผนที่ลูกค้า ไม่มีสิทธิ์เข้าหน้านี้
+        if ($this->session->userdata('role') === 'employee') { redirect('map'); return; }
         $this->load->model('Service_model');
         $this->load->helper(['url','form']);
     }
 
     public function index() {
-        $data['title']   = 'รายการงานบริการ';
-        $data['page_js'] = ['service'];
+        $data['title']         = 'รายการงานบริการ';
+        $data['page_js']       = ['service'];
+        $data['is_superadmin'] = ($this->session->userdata('role') === 'superadmin');
         $this->load->view('templates/header', $data);
         $this->load->view('service/index', $data);
         $this->load->view('templates/footer');

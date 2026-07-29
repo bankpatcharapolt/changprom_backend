@@ -9,6 +9,30 @@
   <style>html,body{margin:0;padding:0;height:100%;font-family:"Sarabun",sans-serif;}#map-page{height:100vh;}</style>
 </head>
 <body>
+
+<!-- แถบบนสุด: ผู้ใช้ปัจจุบัน + ออกจากระบบ (เดิมหน้านี้ไม่ต้อง login เลยไม่มีแถบนี้ ตอนนี้ต้อง login แล้วจึงต้องมีทางออกจากระบบ)
+     โหมด token (embed จาก register-product): ไม่มี session เข้าสู่ระบบเลย จึงโชว์แค่ป้ายชื่อ ไม่มีชื่อผู้ใช้/ปุ่มออกจากระบบ -->
+<div class="d-flex justify-content-between align-items-center px-3" style="height:60px;background:#0d6efd;color:#fff;box-sizing:border-box;">
+  <div class="fw-bold"><i class="bi bi-pin-map-fill me-2"></i>แผนที่ลูกค้า</div>
+  <?php if (empty($token_mode) && empty($token_expired)): ?>
+  <div class="d-flex align-items-center gap-3">
+    <span class="small"><i class="bi bi-person-circle me-1"></i><?= htmlspecialchars($this->session->userdata('full_name') ?? '', ENT_QUOTES) ?></span>
+    <a href="<?= site_url('logout') ?>" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ</a>
+  </div>
+  <?php endif; ?>
+</div>
+
+<?php if (!empty($token_expired)): ?>
+<!-- token ที่ส่งมาหมดอายุหรือไม่ถูกต้อง (ปกติจะเกิดถ้าลิงก์เก่าเกิน 6 วัน) — ไม่ redirect ไป login
+     เพราะผู้เข้าชมทางนี้ไม่มีบัญชีให้ login อยู่แล้ว โชว์ข้อความให้กลับไปค้นหาใหม่แทน -->
+<div class="d-flex flex-column align-items-center justify-content-center text-center px-3" style="height:calc(100vh - 60px);">
+  <i class="bi bi-exclamation-triangle text-danger" style="font-size:3rem;"></i>
+  <h5 class="fw-bold mt-3 mb-1">ลิงก์หมดอายุหรือไม่ถูกต้อง</h5>
+  <p class="text-muted mb-0">กรุณากลับไปค้นหาข้อมูลใหม่อีกครั้งจากหน้าลงทะเบียนสินค้า</p>
+</div>
+<?php else: ?>
+
+<?php if ($show_map ?? true): ?>
 <style>
 /* ═══════════════════════════════════════════════
    BASE
@@ -403,6 +427,7 @@
 
 <div id="map-page">
 
+  <?php if (empty($token_mode)): ?>
   <!-- Stats bar -->
   <div id="stats-bar">
     <div class="stat-chip sc-pending" data-f="pending">
@@ -452,6 +477,19 @@
       <i class="bi bi-arrow-clockwise"></i>
     </button>
   </div>
+  <?php else: ?>
+  <!-- โหมด token: ซ่อนแถบสถานะ + ช่องค้นหา/ตัวกรองทั้งหมด (อ่านอย่างเดียว บิลเดียว ห้ามค้นบิลอื่น) -->
+  <div id="stats-bar" style="display:none;">
+    <span id="c-pending">0</span><span id="c-all">0</span><span id="c-green">0</span>
+    <span id="c-yellow">0</span><span id="c-red">0</span><span id="c-over">0</span>
+  </div>
+  <div id="map-toolbar" style="display:none;">
+    <input type="search" id="search-box" style="display:none;">
+    <select id="tech-filter" style="display:none;"><option value=""></option></select>
+    <select id="jobtype-filter" style="display:none;"><option value=""></option></select>
+    <button id="btn-refresh" style="display:none;"></button>
+  </div>
+  <?php endif; ?>
 
   <!-- Map + Panel -->
   <div id="map-body">
@@ -521,9 +559,18 @@ var API_MARKERS = '<?= site_url("map/api_markers") ?>';
 var API_TECHS     = '<?= site_url("map/api_techs") ?>';
 var API_HISTORY   = '<?= site_url("map/api_history") ?>';
 var API_JOB_TYPES   = '<?= site_url("map/api_job_types") ?>';
+var API_WARRANTY  = '<?= site_url("map/api_warranty_info") ?>';
 var CHANGPROM_URL   = '<?= rtrim(str_replace("service_management", "", base_url()), "/") . "/changprom/queue/detail/" ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
- var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
+var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
+// โหมด token: embed แบบไม่ login จากหน้า register-product ของเว็บ tgsmartlife (อ่านอย่างเดียว บิลเดียว)
+var TOKEN_MODE = <?= !empty($token_mode) ? 'true' : 'false' ?>;
+var TOKEN      = '<?= addslashes($token ?? '') ?>';
+var TOKEN_BILL_NO = '<?= addslashes($token_bill_no ?? '') ?>';
+function withToken(url) {
+  if (!TOKEN_MODE || !TOKEN) return url;
+  return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(TOKEN);
+}
 //var GMAPS_KEY   = 'AIzaSyBiDeosZazrjT1PMnhs7TuKOpjJFDoGUJg';// prod
 function makeMarkerIcon(status, lastServiceType) {
   var colors = {
@@ -595,13 +642,18 @@ function initMap() {
     fullscreenControl: false,
     zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
   });
-  loadTechs();
-  loadJobTypes();
+  if (!TOKEN_MODE) {
+    loadTechs();
+    loadJobTypes();
+  }
   loadMarkers();
 
-  // auto-show ตำแหน่ง user หลัง map init เสร็จ
+  // auto-show ตำแหน่ง user หลัง map init เสร็จ (ข้ามในโหมด token เพราะ map จะ fit ไปที่หมุดบิลนั้นให้เองอยู่แล้ว
+  // ไม่ควรขอสิทธิ์ตำแหน่งจากลูกค้าที่เข้ามาดูแค่บิลเดียวแบบไม่ login)
   // goToLocation เป็น global function อยู่ใน scope เดียวกัน เรียกได้ทันที
-  goToLocation(10); // เปิดมาใหม่ zoom ระดับจังหวัด
+  if (!TOKEN_MODE) {
+    goToLocation(10); // เปิดมาใหม่ zoom ระดับจังหวัด
+  }
 }
 
 function loadTechs() {
@@ -640,10 +692,10 @@ function loadMarkers() {
   var q    = document.getElementById('search-box').value.trim();
   var tech = document.getElementById('tech-filter').value;
   var jobType = document.getElementById('jobtype-filter').value;
-  var url  = API_MARKERS + '?filter=' + currentFilter
+  var url  = withToken(API_MARKERS + '?filter=' + currentFilter
            + '&q=' + encodeURIComponent(q)
            + '&tech=' + encodeURIComponent(tech)
-           + '&job_type=' + encodeURIComponent(jobType);
+           + '&job_type=' + encodeURIComponent(jobType));
 
   markers.forEach(function(m){ m.setMap(null); });
   markers = [];
@@ -676,6 +728,8 @@ function loadMarkers() {
       res.data.forEach(function(d){ bounds.extend({ lat: d.lat, lng: d.lng }); });
       map.fitBounds(bounds);
       if (res.data.length === 1) map.setZoom(15);
+      // โหมด token: มีหมุดเดียวเสมอ เปิดกล่องข้อมูลให้เลย ไม่ต้องรอลูกค้ากดเอง
+      if (TOKEN_MODE) showPanel(res.data[0]);
     }
   });
 }
@@ -710,9 +764,35 @@ function showPanel(d) {
   }
 
   var navUrl = d.map_link || ('https://www.google.com/maps?q=' + d.lat + ',' + d.lng);
-  document.getElementById('btn-navigate').href = navUrl;
-  document.getElementById('btn-detail').href   = SERVICE_URL + '?search=' + encodeURIComponent(d.bill_no);
-  document.getElementById('btn-call').href     = d.phone ? 'tel:' + d.phone.replace(/[^0-9+]/g,'') : '#';
+  var btnNavigate = document.getElementById('btn-navigate');
+  var btnDetail   = document.getElementById('btn-detail');
+  var btnCall     = document.getElementById('btn-call');
+
+  if (TOKEN_MODE) {
+    // เข้าจาก webview (register-product) — ตามที่ระบุ:
+    // "ดูรายละเอียด" (เดิมชี้ไปหน้า /service ซึ่งต้อง login ใช้กับลูกค้าที่ไม่ login ไม่ได้) เปลี่ยนเป็น
+    // "ข้อมูลรับประกันสินค้า" แทน, "นำทาง" เปลี่ยนเป็นเพิ่มเพื่อน LINE, เบอร์โทรใช้เบอร์ Service กลาง
+    btnDetail.style.display = '';
+    btnDetail.innerHTML = 'เช็คประกัน';
+    btnDetail.href = '#';
+    btnDetail.onclick = function (e) { e.preventDefault(); openWarrantyModal(); };
+
+    btnNavigate.innerHTML = 'ติดต่อ LINE';
+    btnNavigate.href = 'https://line.me/R/ti/p/@tgsmartlife';
+
+    btnCall.href = 'tel:0655588553';
+  } else {
+    // login ปกติ (เข้าตรงจาก /map หรือ /customer_map) — พฤติกรรมเดิมทุกอย่าง ไม่เปลี่ยนแปลง
+    btnDetail.style.display = '';
+    btnDetail.innerHTML = '<i class="bi bi-list-ul" style="margin-right:4px;"></i>ดูรายละเอียด';
+    btnDetail.href = SERVICE_URL + '?search=' + encodeURIComponent(d.bill_no);
+    btnDetail.onclick = null;
+
+    btnNavigate.innerHTML = '<i class="bi bi-navigation-fill" style="margin-right:4px;"></i>นำทาง';
+    btnNavigate.href = navUrl;
+
+    btnCall.href = d.phone ? 'tel:' + d.phone.replace(/[^0-9+]/g,'') : '#';
+  }
 
   document.getElementById('info-panel').classList.add('is-open');
   if (window.innerWidth <= 640) document.body.classList.add('panel-open');
@@ -826,7 +906,7 @@ function openHistoryModal(name) {
   document.getElementById('hm-loading').style.display = 'block';
   new bootstrap.Modal(document.getElementById('historyModal')).show();
 
-  fetch(API_HISTORY + '?name=' + encodeURIComponent(name))
+  fetch(withToken(API_HISTORY + '?name=' + encodeURIComponent(name)))
     .then(function(r) { return r.json(); })
     .then(function(res) {
       document.getElementById('hm-loading').style.display = 'none';
@@ -839,6 +919,13 @@ function openHistoryModal(name) {
         var statusCls = r.status === 'เสร็จแล้ว' ? 'hs-done'
                       : (r.status === 'รอดำเนินการ' || r.status === 'ยืนยันแล้ว') ? 'hs-pending' : 'hs-other';
         var dateStr = r.start_time ? r.start_time.substr(0,10) : (r.install_date || '-');
+        var detailUrl = CHANGPROM_URL + r.id;
+        if (TOKEN_MODE) {
+          detailUrl += '?bill_number=' + encodeURIComponent(TOKEN_BILL_NO) + '&from=register-product';
+        }else{
+          detailUrl += '?from=map';
+        }
+        var detailBtn = '<a href="' + detailUrl + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" style="font-size:.75rem;padding:3px 10px;flex-shrink:0;"><i class="bi bi-box-arrow-up-right me-1"></i>รายละเอียด</a>';
         html += '<div class="hrow">'
           + '<div class="hrow-top">'
           + '<span class="hrow-bill">' + (r.bill_no || '#'+r.id) + '</span>'
@@ -848,7 +935,7 @@ function openHistoryModal(name) {
           + (r.product_service ? '<div class="hrow-prod">' + r.product_service + '</div>' : '')
           + '<div class="hrow-tech-row">'
           + (r.technician ? '<span class="hrow-tech"><i class="bi bi-tools me-1"></i>' + r.technician + '</span>' : '<span></span>')
-          + '<a href="' + CHANGPROM_URL + r.id + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" style="font-size:.75rem;padding:3px 10px;flex-shrink:0;"><i class="bi bi-box-arrow-up-right me-1"></i>รายละเอียด</a>'
+          + detailBtn
           + '</div>'
           + '</div>';
       });
@@ -857,6 +944,42 @@ function openHistoryModal(name) {
     .catch(function() {
       document.getElementById('hm-loading').style.display = 'none';
       document.getElementById('hm-list').innerHTML = '<div class="text-center text-danger py-3 small">โหลดข้อมูลไม่สำเร็จ</div>';
+    });
+}
+
+/* ── ข้อมูลรับประกันสินค้า (โหมด token) ─────────────────── */
+function wCol(label, val) {
+  return '<div class="mb-2"><div class="small text-muted">' + label + '</div><div class="fw-medium">' + (val || '-') + '</div></div>';
+}
+function openWarrantyModal() {
+  document.getElementById('wm-body').innerHTML = '';
+  document.getElementById('wm-loading').style.display = 'block';
+  new bootstrap.Modal(document.getElementById('warrantyModal')).show();
+
+  fetch(withToken(API_WARRANTY))
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      document.getElementById('wm-loading').style.display = 'none';
+      if (!res.success) {
+        document.getElementById('wm-body').innerHTML = '<div class="text-center text-muted py-3 small">' + (res.message || 'ไม่พบข้อมูลการลงทะเบียนรับประกัน') + '</div>';
+        return;
+      }
+      var d = res.data;
+      var html = wCol('สินค้า', d.product_name)
+        + wCol('เลขที่บิล', d.bill_number)
+        + wCol('เบอร์โทรที่ลงทะเบียน', d.tel_cus)
+        + (d.tel_idcart ? wCol('เลขบัตรประชาชน', d.tel_idcart) : '')
+        + (d.product_warranty ? wCol('เงื่อนไขการรับประกัน', d.product_warranty) : '')
+        + (d.detail ? wCol('รายละเอียดเพิ่มเติม', d.detail) : '')
+        + (d.link ? '<div class="mb-2"><a href="' + d.link + '" target="_blank" rel="noopener">คู่มือการใช้งาน</a></div>' : '')
+        + (d.file_path ? '<div class="mb-2"><a href="' + d.file_path + '" target="_blank" rel="noopener">คู่มือการใช้งาน (ไฟล์แนบ)</a></div>' : '')
+        + (d.created ? wCol('วันที่ลงทะเบียน', d.created.substr(0, 10)) : '')
+        + (d.updated ? wCol('แก้ไขล่าสุด', d.updated.substr(0, 10)) : '');
+      document.getElementById('wm-body').innerHTML = html;
+    })
+    .catch(function() {
+      document.getElementById('wm-loading').style.display = 'none';
+      document.getElementById('wm-body').innerHTML = '<div class="text-center text-danger py-3 small">โหลดข้อมูลไม่สำเร็จ</div>';
     });
 }
 
@@ -909,6 +1032,35 @@ if (window.innerWidth <= 640) {
   </div>
 </div>
 
+<!-- ── ข้อมูลรับประกันสินค้า (โหมด token เท่านั้น) — แทนที่ลิงก์ "รายละเอียด" เดิม
+     ที่ชี้ไปหน้า admin ซึ่งใช้ไม่ได้กับลูกค้าที่ไม่ได้ login อยู่แล้ว ──────────────── -->
+<div class="modal fade" id="warrantyModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title mb-0"><i class="bi bi-shield-check me-2 text-success"></i>ข้อมูลรับประกันสินค้า</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="wm-loading" class="text-center py-4 text-muted small">
+          <div class="spinner-border spinner-border-sm me-2"></div>กำลังโหลด...
+        </div>
+        <div id="wm-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<?php else: ?>
+
+<!-- employee ที่ login แล้วแต่ยังไม่ได้รับสิทธิ์ดูแผนที่ (map_access = 0) -->
+<div class="d-flex flex-column align-items-center justify-content-center text-center px-3" style="height:calc(100vh - 60px);">
+  <i class="bi bi-hourglass-split text-warning" style="font-size:3rem;"></i>
+  <h5 class="fw-bold mt-3 mb-1">รอการอนุมัติสิทธิ์เข้าถึงแผนที่ลูกค้า</h5>
+  <p class="text-muted mb-0">บัญชีของคุณยังไม่ได้รับสิทธิ์ดูแผนที่ลูกค้า กรุณาติดต่อผู้ดูแลระบบ</p>
+</div>
+<?php endif; ?>
+<?php endif; /* ปิด token_expired if/else */ ?>
 </body>
 </html>

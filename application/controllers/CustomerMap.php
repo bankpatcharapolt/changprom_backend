@@ -3,19 +3,52 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class CustomerMap extends CI_Controller {
 
-    // method ที่ไม่ต้อง login (public access)
-    private $public_methods = ['public_index', 'api_markers', 'api_techs', 'api_history', 'api_job_types'];
+    // เดิม public_index/api_* อยู่ในกลุ่ม "ไม่ต้อง login" (public access)
+    // ตอนนี้เปลี่ยนตาม requirement ใหม่: ทุกหน้า/ทุก endpoint ในนี้ต้อง login เสมอ ไม่มีอะไร public แล้ว
+    // ยกเว้นเมธอดใน $token_allowed_methods ที่ยอมให้เข้าด้วย token แทนได้ (ดูด้านล่าง)
+    private $public_methods = [];
+
+    // เมธอดที่ยอมให้เข้าถึงด้วย token แทนการ login — ใช้เฉพาะกรณี embed แผนที่
+    // (อ่านอย่างเดียว บิลเดียว) จากหน้า tgsmartlife.com/register-product เท่านั้น
+    private $token_allowed_methods = ['public_index', 'api_markers', 'api_history', 'api_warranty_info'];
+
+    // เลขบิลที่ตรวจผ่านจาก token ของ request นี้ (null = ไม่ได้ใช้ token หรือยังไม่ตรวจ)
+    private $token_bill_no = null;
+    // true = มี token ส่งมาด้วยแต่ตรวจไม่ผ่าน (ปลอม/หมดอายุ) — ต้องปฏิเสธชัดเจน ห้าม fallback เงียบๆ
+    private $token_invalid = false;
 
     public function __construct() {
         parent::__construct();
         $method = $this->router->fetch_method();
+        $token  = $this->input->get('token', TRUE);
+
+        if (!empty($token) && in_array($method, $this->token_allowed_methods)) {
+            $this->load->library('map_token');
+            $bill_no = $this->map_token->verify($token);
+            if ($bill_no) {
+                $this->token_bill_no = $bill_no;
+            } else {
+                $this->token_invalid = true;
+            }
+            // มี token มาด้วย (ไม่ว่าจะผ่านหรือไม่) ข้ามการเช็ค login ไปเลย ปล่อยให้แต่ละเมธอด
+            // จัดการเอง (โชว์แผนที่ถ้า token ผ่าน / โชว์ข้อความลิงก์หมดอายุถ้าไม่ผ่าน) —
+            // ไม่ redirect ไป /login เพราะผู้เข้าชมทางนี้ไม่มีบัญชีให้ login อยู่แล้ว
+            return;
+        }
+
         if (!in_array($method, $this->public_methods) && !$this->session->userdata('logged_in')) {
             redirect('login');
+            return;
         }
     }
 
-    // หน้าสำหรับ admin (ต้อง login, มี header/footer)
+    // หน้าสำหรับ superadmin/admin/staff (ต้อง login, มี header/footer)
+    // role = employee ห้ามเข้าหน้านี้ ให้ใช้ /map แทน (ซึ่งมีระบบสิทธิ์ของตัวเอง)
     public function index() {
+        if ($this->session->userdata('role') === 'employee') {
+            redirect('map');
+            return;
+        }
         $data['title']     = 'แผนที่ลูกค้า';
         $data['gmaps_key'] = $this->config->item('gmaps_key') ?? '';
         $this->load->view('templates/header', $data);
@@ -23,22 +56,53 @@ class CustomerMap extends CI_Controller {
         $this->load->view('templates/footer');
     }
 
-    // หน้า public (ไม่ต้อง login, ไม่มี header/footer)
+    // หน้า /map — เดิมเป็น public ไม่ต้อง login (ไม่มี header/footer)
+    // ตอนนี้ต้อง login เสมอ (เช็คใน __construct แล้ว) และถ้า role = employee ต้องได้รับสิทธิ์ (map_access)
+    // ก่อนถึงจะเห็นแผนที่จริง — ไม่งั้นจะเห็นข้อความ "รอการอนุมัติสิทธิ์" แทน (ดูใน view)
+    // ชื่อฟังก์ชันยังคงเป็น public_index เหมือนเดิม (ไม่ได้แปลว่า public แล้ว) เพื่อไม่แก้ routes.php เกินจำเป็น
+    //
+    // โหมด token (embed จาก register-product): ข้าม login/สิทธิ์พนักงานไปเลย โชว์เฉพาะบิลเดียว
+    // ตาม token, ถ้า token หมดอายุ/ปลอม โชว์ข้อความแจ้งแทนแผนที่ (ไม่ redirect ไป login)
     public function public_index() {
-        $data['title']     = 'แผนที่ลูกค้า';
-        $data['gmaps_key'] = $this->config->item('gmaps_key') ?? '';
+        $data['title']         = 'แผนที่ลูกค้า';
+        $data['gmaps_key']     = $this->config->item('gmaps_key') ?? '';
+        $data['token_expired'] = $this->token_invalid;
+        $data['token_mode']    = ($this->token_bill_no !== null);
+        $data['token_bill_no'] = $this->token_bill_no;
+        $data['token']         = $this->input->get('token', TRUE) ?: '';
+        $data['show_map']      = $this->token_invalid
+            ? false
+            : (($this->token_bill_no !== null) ? true : $this->_employee_allowed());
         $this->load->view('customer_map/public', $data);
+    }
+
+    // true = ดูแผนที่ได้ (role อื่นที่ไม่ใช่ employee เข้าได้เสมอ, employee ต้องมี map_access = 1)
+    private function _employee_allowed() {
+        if ($this->session->userdata('role') !== 'employee') {
+            return true;
+        }
+        $this->load->model('Employee_model');
+        return $this->Employee_model->has_map_access($this->session->userdata('user_id'));
+    }
+
+    private function _forbidden_json() {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้'], JSON_UNESCAPED_UNICODE);
     }
 
     // API: markers
     public function api_markers() {
         header('Content-Type: application/json; charset=utf-8');
+        if ($this->token_invalid) { $this->_forbidden_json(); return; }
+        if ($this->token_bill_no === null && !$this->_employee_allowed()) { $this->_forbidden_json(); return; }
         try {
 
-        $q        = trim($this->input->get('q',        TRUE) ?? '');
-        $filter   = trim($this->input->get('filter',    TRUE) ?? 'all');
-        $tech     = trim($this->input->get('tech',      TRUE) ?? '');
-        $job_type = trim($this->input->get('job_type',  TRUE) ?? '');
+        // โหมด token: บังคับกรองเหลือแค่บิลเดียวตาม token เสมอ ไม่สนใจ filter/q/tech/job_type ที่ส่งมา
+        $q        = $this->token_bill_no ? '' : trim($this->input->get('q',        TRUE) ?? '');
+        $filter   = $this->token_bill_no ? 'all' : trim($this->input->get('filter',    TRUE) ?? 'all');
+        $tech     = $this->token_bill_no ? '' : trim($this->input->get('tech',      TRUE) ?? '');
+        $job_type = $this->token_bill_no ? '' : trim($this->input->get('job_type',  TRUE) ?? '');
         $today    = date('Y-m-d');
 
         // ── ดึง "วันที่เปลี่ยนไส้กรองล่าสุด" ต่อลูกค้า (customer_name) ──
@@ -94,6 +158,16 @@ class CustomerMap extends CI_Controller {
         if (!empty($tech)) {
             $where_extra .= " AND sj2.technician LIKE ?";
             $binds[] = "%{$tech}%";
+        }
+        if (!empty($this->token_bill_no)) {
+            // โหมด token: จำกัดเหลือแค่บิลนี้บิลเดียว
+            // service_jobs.bill_no มักมีต่อท้ายเป็น _1, _2 ฯลฯ (เช่น RT-2606007_1) ในขณะที่
+            // product_regis.bill_number (ฝั่ง tgsmartlife) เก็บเป็นเลขบิลเปล่าๆ — เทียบตรงเป๊ะ (=)
+            // อย่างเดียวจะหาไม่เจอ แต่ LIKE 'เลขบิล%' เฉยๆ ก็เสี่ยงไปจับบิลอื่นที่ขึ้นต้นด้วยเลขเดียวกัน
+            // โดยบังเอิญ (เช่น RT-26060820) จึงเทียบแบบ "ตรงเป๊ะ" หรือ "ตรงเป๊ะ+ตามด้วย _" เท่านั้น
+            $where_extra .= " AND (sj2.bill_no = ? OR sj2.bill_no LIKE ?)";
+            $binds[] = $this->token_bill_no;
+            $binds[] = $this->token_bill_no . '\\_%';
         }
 
         // subquery 1a: หา job ที่มีพิกัดจริง (close/start lat) ต่อลูกค้า
@@ -338,8 +412,25 @@ class CustomerMap extends CI_Controller {
     }
 
     // API: ประวัติการให้บริการของลูกค้า (ค้นจาก customer_name)
+    // โหมด token: จำกัดเหลือแค่ประวัติของ "บิลนี้บิลเดียว" (ไม่ใช่ทั้ง customer_name) กันไม่ให้
+    // เห็นบิล/ที่อยู่อื่นของลูกค้าคนเดียวกันที่ไม่เกี่ยวกับบิลที่ค้นหามา
     public function api_history() {
         header('Content-Type: application/json; charset=utf-8');
+        if ($this->token_invalid) { $this->_forbidden_json(); return; }
+
+        if ($this->token_bill_no !== null) {
+            // เหตุผลเดียวกับ api_markers() — bill_no ฝั่งนี้มักมีต่อท้าย _1, _2 ฯลฯ
+            // ใช้ query แบบเดียวกัน (ตรงเป๊ะ หรือ ตรงเป๊ะ+ตามด้วย _) ให้สอดคล้องกัน
+            $sql = "SELECT id, bill_no, job_type, install_date, start_time, status, product_service, technician, tech_note
+                    FROM service_jobs
+                    WHERE bill_no = ? OR bill_no LIKE ?
+                    ORDER BY install_date DESC, id DESC";
+            $rows = $this->db->query($sql, [$this->token_bill_no, $this->token_bill_no . '\\_%'])->result_array();
+            echo json_encode(['success'=>true,'data'=>$rows], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        if (!$this->_employee_allowed()) { $this->_forbidden_json(); return; }
         $name = trim($this->input->get('name', TRUE) ?? '');
         if (empty($name)) {
             echo json_encode(['success'=>false,'message'=>'ไม่ระบุชื่อลูกค้า'], JSON_UNESCAPED_UNICODE);
@@ -355,9 +446,36 @@ class CustomerMap extends CI_Controller {
         echo json_encode(['success'=>true,'data'=>$rows], JSON_UNESCAPED_UNICODE);
     }
 
+    // API: ข้อมูลรับประกันสินค้า (จากฐานข้อมูลของเว็บ tgsmartlife) — แทนที่ลิงก์ "รายละเอียด"
+    // เดิมที่ชี้ไปหน้า admin (ใช้ไม่ได้กับลูกค้าที่เข้าผ่าน token อยู่แล้ว เพราะต้อง login)
+    public function api_warranty_info() {
+        header('Content-Type: application/json; charset=utf-8');
+        if ($this->token_invalid) { $this->_forbidden_json(); return; }
+
+        $bill_no = $this->token_bill_no;
+        if (empty($bill_no)) {
+            // staff/admin ที่ login ปกติ เรียกดูโดยระบุ bill_no เองผ่าน query string ได้เช่นกัน
+            if (!$this->_employee_allowed()) { $this->_forbidden_json(); return; }
+            $bill_no = trim($this->input->get('bill_no', TRUE) ?? '');
+        }
+        if (empty($bill_no)) {
+            echo json_encode(['success'=>false,'message'=>'ไม่ระบุเลขที่บิล'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        $this->load->model('Warranty_model');
+        $row = $this->Warranty_model->get_by_bill($bill_no);
+        if (!$row) {
+            echo json_encode(['success'=>false,'message'=>'ไม่พบข้อมูลการลงทะเบียนรับประกันสำหรับบิลนี้'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        echo json_encode(['success'=>true,'data'=>$row], JSON_UNESCAPED_UNICODE);
+    }
+
     // API: job_types ที่มีจริงใน last_service ของแต่ละลูกค้า
     public function api_job_types() {
         header('Content-Type: application/json; charset=utf-8');
+        if (!$this->_employee_allowed()) { $this->_forbidden_json(); return; }
         $sql = "
             SELECT DISTINCT
                 SUBSTRING_INDEX(GROUP_CONCAT(job_type ORDER BY start_time DESC SEPARATOR '|'), '|', 1) AS last_type
@@ -378,6 +496,7 @@ class CustomerMap extends CI_Controller {
     // ให้ตรงกับ logic เดียวกับ api_markers() — กันไม่ให้ dropdown มีชื่อช่างที่กดแล้วไม่ขึ้นหมุดเลย
     public function api_techs() {
         header('Content-Type: application/json; charset=utf-8');
+        if (!$this->_employee_allowed()) { $this->_forbidden_json(); return; }
         $sql = "
             SELECT DISTINCT sj.technician
             FROM service_jobs sj
