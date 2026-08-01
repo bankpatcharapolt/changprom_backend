@@ -425,6 +425,14 @@
 }
 </style>
 
+<!-- โหมด token: ค้นบิลเจอใน tgsmartlife แต่ไม่มีงานบริการที่ตรงกันในระบบนี้เลย (ไม่มีหมุดให้แสดง)
+     ซ่อนไว้ก่อน โชว์ด้วย JS แทนแผนที่เปล่าๆ ตอน loadMarkers() เจอ 0 รายการ (รู้ได้แค่ตอนรัน ไม่ใช่ตอน render ฝั่ง PHP) -->
+<div id="no-data-message" class="d-flex flex-column align-items-center justify-content-center text-center px-3" style="height:calc(100vh - 60px); display:none;">
+  <i class="bi bi-search text-muted" style="font-size:3rem;"></i>
+  <h5 class="fw-bold mt-3 mb-1">ไม่พบข้อมูล</h5>
+  <p class="text-muted mb-0">ไม่พบข้อมูลการให้บริการของหมายเลขบิลนี้ในระบบ</p>
+</div>
+
 <div id="map-page">
 
   <?php if (empty($token_mode)): ?>
@@ -560,6 +568,7 @@ var API_TECHS     = '<?= site_url("map/api_techs") ?>';
 var API_HISTORY   = '<?= site_url("map/api_history") ?>';
 var API_JOB_TYPES   = '<?= site_url("map/api_job_types") ?>';
 var API_WARRANTY  = '<?= site_url("map/api_warranty_info") ?>';
+var API_JOB_DETAIL = '<?= site_url("map/api_job_detail") ?>';
 var CHANGPROM_URL   = '<?= rtrim(str_replace("service_management", "", base_url()), "/") . "/changprom/queue/detail/" ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
 var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
@@ -567,6 +576,8 @@ var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
 var TOKEN_MODE = <?= !empty($token_mode) ? 'true' : 'false' ?>;
 var TOKEN      = '<?= addslashes($token ?? '') ?>';
 var TOKEN_BILL_NO = '<?= addslashes($token_bill_no ?? '') ?>';
+// มุมมองพนักงานทั่วไป (login ปกติ ไม่ใช่ token) — คุมปุ่ม "ดูรายละเอียด" ให้เป็น popup จำกัดฟิลด์
+var IS_EMPLOYEE_VIEW = <?= !empty($is_employee_view) ? 'true' : 'false' ?>;
 function withToken(url) {
   if (!TOKEN_MODE || !TOKEN) return url;
   return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(TOKEN);
@@ -724,12 +735,19 @@ function loadMarkers() {
       markers.push(m);
     });
     if (res.data.length > 0) {
+      document.getElementById('no-data-message').style.display = 'none';
+      document.getElementById('map-page').style.display = '';
       var bounds = new google.maps.LatLngBounds();
       res.data.forEach(function(d){ bounds.extend({ lat: d.lat, lng: d.lng }); });
       map.fitBounds(bounds);
       if (res.data.length === 1) map.setZoom(15);
       // โหมด token: มีหมุดเดียวเสมอ เปิดกล่องข้อมูลให้เลย ไม่ต้องรอลูกค้ากดเอง
       if (TOKEN_MODE) showPanel(res.data[0]);
+    } else if (TOKEN_MODE) {
+      // ค้นบิลนี้เจอฝั่ง tgsmartlife (ถึงมี token ให้) แต่ไม่มีงานบริการที่ตรงกันเลยในระบบนี้
+      // โชว์ข้อความไม่พบข้อมูลแทนแผนที่เปล่าๆ ที่ไม่มีหมุดให้ดู
+      document.getElementById('map-page').style.display = 'none';
+      document.getElementById('no-data-message').style.display = '';
     }
   });
 }
@@ -781,6 +799,18 @@ function showPanel(d) {
     btnNavigate.href = 'https://line.me/R/ti/p/@tgsmartlife';
 
     btnCall.href = 'tel:0655588553';
+  } else if (IS_EMPLOYEE_VIEW) {
+    // มุมมองพนักงานทั่วไป (login ปกติ role=employee, ไม่ใช่ token) — "นำทาง"/เบอร์โทร เหมือนเดิมทุกอย่าง
+    // มีแค่ "ดูรายละเอียด" เปลี่ยนเป็น popup แบบจำกัดฟิลด์ แทนการเด้งไปหน้า /service ซึ่งพนักงานเข้าไม่ได้
+    btnDetail.style.display = '';
+    btnDetail.innerHTML = '<i class="bi bi-list-ul" style="margin-right:4px;"></i>ดูรายละเอียด';
+    btnDetail.href = '#';
+    btnDetail.onclick = function (e) { e.preventDefault(); openJobDetailModal(d.id); };
+
+    btnNavigate.innerHTML = '<i class="bi bi-navigation-fill" style="margin-right:4px;"></i>นำทาง';
+    btnNavigate.href = navUrl;
+
+    btnCall.href = d.phone ? 'tel:' + d.phone.replace(/[^0-9+]/g,'') : '#';
   } else {
     // login ปกติ (เข้าตรงจาก /map หรือ /customer_map) — พฤติกรรมเดิมทุกอย่าง ไม่เปลี่ยนแปลง
     btnDetail.style.display = '';
@@ -947,6 +977,49 @@ function openHistoryModal(name) {
     });
 }
 
+/* ── รายละเอียดงาน (มุมมองพนักงานทั่วไป) — จำกัดฟิลด์ตามที่ระบุ ────────── */
+function openJobDetailModal(id) {
+  document.getElementById('jd-body').innerHTML = '';
+  document.getElementById('jd-loading').style.display = 'block';
+  new bootstrap.Modal(document.getElementById('jobDetailModal')).show();
+
+  fetch(API_JOB_DETAIL + '/' + id)
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      document.getElementById('jd-loading').style.display = 'none';
+      if (!res.success) {
+        document.getElementById('jd-body').innerHTML = '<div class="text-center text-muted py-3 small">' + (res.message || 'ไม่พบข้อมูล') + '</div>';
+        return;
+      }
+      var d = res.data;
+      var mapsUrl = '';
+      if (d.location) {
+        var raw = ('' + d.location).trim();
+        mapsUrl = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(raw) ? ('https://www.google.com/maps?q=' + raw) : raw;
+      }
+      var loc = mapsUrl
+        ? '<a href="' + mapsUrl + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-geo-alt me-1"></i>เปิด Maps</a>'
+        : '-';
+      var html = wCol('เลขที่บิล', d.bill_no)
+        + wCol('ชื่อลูกค้า', d.customer_name)
+        + wCol('เบอร์โทร', d.phone)
+        + wCol('วันที่ซื้อ', d.purchase_date ? d.purchase_date.substr(0, 10) : '')
+        + wCol('ที่อยู่', d.address)
+        + '<div class="mb-2"><div class="small text-muted">Location</div>' + loc + '</div>'
+        + wCol('ช่าง', d.technician)
+        + wCol('ทีม', d.team)
+        + wCol('สาขา', d.branch)
+        + wCol('รหัสพนักงาน', d.sale_code)
+        + wCol('สินค้า/บริการ', d.product_service)
+        + wCol('แท็ก', d.tags);
+      document.getElementById('jd-body').innerHTML = html;
+    })
+    .catch(function () {
+      document.getElementById('jd-loading').style.display = 'none';
+      document.getElementById('jd-body').innerHTML = '<div class="text-center text-danger py-3 small">โหลดข้อมูลไม่สำเร็จ</div>';
+    });
+}
+
 /* ── ข้อมูลรับประกันสินค้า (โหมด token) ─────────────────── */
 function wCol(label, val) {
   return '<div class="mb-2"><div class="small text-muted">' + label + '</div><div class="fw-medium">' + (val || '-') + '</div></div>';
@@ -1027,6 +1100,25 @@ if (window.innerWidth <= 640) {
           <div class="spinner-border spinner-border-sm me-2"></div>กำลังโหลด...
         </div>
         <div id="hm-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── รายละเอียดงาน (มุมมองพนักงานทั่วไปเท่านั้น) — แบบจำกัดฟิลด์ ไม่รวมประเภทงาน/สถานะ/
+     วันที่นัด/เวลา/หมายเหตุช่าง/หมายเหตุบิล และไม่รวมตำแหน่งที่ช่างบันทึกการเข้างาน ──────── -->
+<div class="modal fade" id="jobDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title mb-0"><i class="bi bi-info-circle me-2"></i>รายละเอียด</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="jd-loading" class="text-center py-4 text-muted small">
+          <div class="spinner-border spinner-border-sm me-2"></div>กำลังโหลด...
+        </div>
+        <div id="jd-body"></div>
       </div>
     </div>
   </div>

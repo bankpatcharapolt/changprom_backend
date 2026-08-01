@@ -73,6 +73,9 @@ class CustomerMap extends CI_Controller {
         $data['show_map']      = $this->token_invalid
             ? false
             : (($this->token_bill_no !== null) ? true : $this->_employee_allowed());
+        // มุมมองพนักงานทั่วไป (login ปกติ ไม่ใช่ token) — ใช้คุมปุ่ม "ดูรายละเอียด" ให้เป็น popup
+        // แบบจำกัดฟิลด์แทนการเด้งไปหน้า /service ซึ่งพนักงานเข้าไม่ได้อยู่แล้ว
+        $data['is_employee_view'] = ($this->token_bill_no === null && $this->session->userdata('role') === 'employee');
         $this->load->view('customer_map/public', $data);
     }
 
@@ -467,6 +470,33 @@ class CustomerMap extends CI_Controller {
         $row = $this->Warranty_model->get_by_bill($bill_no);
         if (!$row) {
             echo json_encode(['success'=>false,'message'=>'ไม่พบข้อมูลการลงทะเบียนรับประกันสำหรับบิลนี้'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        echo json_encode(['success'=>true,'data'=>$row], JSON_UNESCAPED_UNICODE);
+    }
+
+    // API: รายละเอียดงาน (แบบจำกัดฟิลด์) สำหรับพนักงานทั่วไปเท่านั้น กด "ดูรายละเอียด" บน /map
+    // ดึงจากตาราง service_jobs ตัวเดียวกับที่ /service?search= ใช้ (api/service/{id}) แต่ตัดฟิลด์
+    // ประเภทงาน, สถานะ, วันที่นัด, เวลา, หมายเหตุช่าง, หมายเหตุบิล และไม่ดึงตำแหน่งที่ช่างบันทึก
+    // การเข้างาน (start_lat/start_lng/start_time/start_address) ออกทั้งหมดตามที่ระบุ
+    public function api_job_detail($id) {
+        header('Content-Type: application/json; charset=utf-8');
+        if ($this->token_invalid) { $this->_forbidden_json(); return; }
+        // จำกัดเฉพาะ role=employee ที่ login ปกติ (ไม่ใช่ token) และมีสิทธิ์ดูแผนที่อยู่แล้วเท่านั้น
+        // admin/superadmin/staff ใช้ปุ่ม "ดูรายละเอียด" แบบเดิม (เด้งไปหน้า /service) ไม่ผ่านจุดนี้
+        if ($this->token_bill_no !== null
+            || $this->session->userdata('role') !== 'employee'
+            || !$this->_employee_allowed()) {
+            $this->_forbidden_json(); return;
+        }
+
+        $row = $this->db
+            ->select('id, bill_no, customer_name, phone, purchase_date, address, location, technician, team, branch, sale_code, product_service, tags')
+            ->where('id', (int)$id)
+            ->get('service_jobs')
+            ->row_array();
+        if (!$row) {
+            echo json_encode(['success'=>false,'message'=>'ไม่พบข้อมูล'], JSON_UNESCAPED_UNICODE);
             return;
         }
         echo json_encode(['success'=>true,'data'=>$row], JSON_UNESCAPED_UNICODE);

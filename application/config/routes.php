@@ -50,6 +50,7 @@ $route['map']                             = 'CustomerMap/public_index';
 $route['map/api_markers']                 = 'CustomerMap/api_markers';   // reuse เดิม
 $route['map/api_techs']                   = 'CustomerMap/api_techs';     // reuse เดิม
 $route['map/api_warranty_info']           = 'CustomerMap/api_warranty_info';
+$route['map/api_job_detail/(:num)']       = 'CustomerMap/api_job_detail/$1';
 $route['branch']                      = 'Branch/index';
 $route['api/branch']                  = 'Branch/api_list';
 $route['api/branch/active']           = 'Branch/api_active';
