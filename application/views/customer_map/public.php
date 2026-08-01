@@ -425,14 +425,6 @@
 }
 </style>
 
-<!-- โหมด token: ค้นบิลเจอใน tgsmartlife แต่ไม่มีงานบริการที่ตรงกันในระบบนี้เลย (ไม่มีหมุดให้แสดง)
-     ซ่อนไว้ก่อน โชว์ด้วย JS แทนแผนที่เปล่าๆ ตอน loadMarkers() เจอ 0 รายการ (รู้ได้แค่ตอนรัน ไม่ใช่ตอน render ฝั่ง PHP) -->
-<div id="no-data-message" class="d-flex flex-column align-items-center justify-content-center text-center px-3" style="height:calc(100vh - 60px); display:none;">
-  <i class="bi bi-search text-muted" style="font-size:3rem;"></i>
-  <h5 class="fw-bold mt-3 mb-1">ไม่พบข้อมูล</h5>
-  <p class="text-muted mb-0">ไม่พบข้อมูลการให้บริการของหมายเลขบิลนี้ในระบบ</p>
-</div>
-
 <div id="map-page">
 
   <?php if (empty($token_mode)): ?>
@@ -735,7 +727,6 @@ function loadMarkers() {
       markers.push(m);
     });
     if (res.data.length > 0) {
-      document.getElementById('no-data-message').style.display = 'none';
       document.getElementById('map-page').style.display = '';
       var bounds = new google.maps.LatLngBounds();
       res.data.forEach(function(d){ bounds.extend({ lat: d.lat, lng: d.lng }); });
@@ -745,9 +736,12 @@ function loadMarkers() {
       if (TOKEN_MODE) showPanel(res.data[0]);
     } else if (TOKEN_MODE) {
       // ค้นบิลนี้เจอฝั่ง tgsmartlife (ถึงมี token ให้) แต่ไม่มีงานบริการที่ตรงกันเลยในระบบนี้
-      // โชว์ข้อความไม่พบข้อมูลแทนแผนที่เปล่าๆ ที่ไม่มีหมุดให้ดู
+      // หน้านี้เป็น iframe ฝังอยู่ใน register-product — ข้อความ "ไม่พบข้อมูล" ต้องไปโชว์ที่
+      // หน้า register-product เท่านั้น ไม่ใช่ในนี้ ที่นี่แค่ซ่อนแผนที่เปล่าแล้วส่งสัญญาณบอกหน้าแม่
       document.getElementById('map-page').style.display = 'none';
-      document.getElementById('no-data-message').style.display = '';
+      if (window.parent !== window) {
+        window.parent.postMessage({ source: 'tg_customer_map', status: 'no_data' }, '*');
+      }
     }
   });
 }
