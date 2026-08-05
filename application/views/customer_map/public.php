@@ -561,7 +561,7 @@ var API_HISTORY   = '<?= site_url("map/api_history") ?>';
 var API_JOB_TYPES   = '<?= site_url("map/api_job_types") ?>';
 var API_WARRANTY  = '<?= site_url("map/api_warranty_info") ?>';
 var API_JOB_DETAIL = '<?= site_url("map/api_job_detail") ?>';
-var CHANGPROM_URL   = '<?= rtrim(str_replace("service_management", "", base_url()), "/") . "/changprom/queue/detail/" ?>';
+var CHANGPROM_URL   = '<?= "https://changprom.tgsmartlife.com" . "/queue/detail/" ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
 var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
 // โหมด token: embed แบบไม่ login จากหน้า register-product ของเว็บ tgsmartlife (อ่านอย่างเดียว บิลเดียว)
