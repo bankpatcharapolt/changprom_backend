@@ -106,33 +106,51 @@ class CustomerMap extends CI_Controller {
         $filter   = $this->token_bill_no ? 'all' : trim($this->input->get('filter',    TRUE) ?? 'all');
         $tech     = $this->token_bill_no ? '' : trim($this->input->get('tech',      TRUE) ?? '');
         $job_type = $this->token_bill_no ? '' : trim($this->input->get('job_type',  TRUE) ?? '');
+        $category = $this->token_bill_no ? '' : trim($this->input->get('category',  TRUE) ?? '');
+        $debugSample = [];
         $today    = date('Y-m-d');
 
-        // ── รอบระยะเวลาบริการต่อสินค้า (จาก tgsmartlife.product) ──────────
-        // จับคู่ product_service (ชื่อสินค้าที่กรอกไว้ในงานบริการ) กับ product.regis_name
-        // ฝั่ง tgsmartlife แบบตรงเป๊ะ (เหมือนตอน import product_regis) ถ้าเจอและตั้งค่า
-        // service_cycle_value/unit ไว้ ใช้รอบนั้นแทน 6 เดือนที่เคย hardcode ไว้ ถ้าไม่เจอ
-        // (สินค้าไม่ตรง หรือยังไม่ได้ตั้งค่า) ใช้รอบ 6 เดือนเดิมเหมือนที่เคยมีมาตลอด
-        $serviceCycleByRegisName = [];
+        // ── รอบระยะเวลาบริการ + หมวดหมู่ (หลัก+ย่อย) ต่อสินค้า ──────────────────────
+        // จับคู่ผ่าน bill_no: service_jobs.bill_no (ตัดส่วนต่อท้าย _1,_2 ฯลฯ ออกก่อน) ->
+        // tgsmartlife.product_regis.bill_number -> product_regis.product_id -> product
+        // (ต้อง product_id ไม่เป็น NULL ด้วย) — ไม่ใช่การจับคู่ผ่านชื่อสินค้า (product_service/
+        // regis_name) แบบที่เคยทำผิดไป ไม่เจอ/ไม่มี product_id ใช้รอบ 6 เดือนเดิม ไม่กรองออกจากหมวดหมู่
+        $serviceCycleByBillNumber = [];
+        $categoryByBillNumber = [];
+        $tgDebug = ['connected' => false, 'error' => null, 'rows_fetched' => 0];
         try {
             $tg_db = $this->load->database('tgsmartlife', TRUE);
             $cyc_rows = $tg_db
-                ->select('regis_name, service_cycle_value, service_cycle_unit')
-                ->where('regis_name IS NOT NULL', null, false)
-                ->where('regis_name !=', '')
-                ->where('service_cycle_value IS NOT NULL', null, false)
-                ->where('service_cycle_unit IS NOT NULL', null, false)
-                ->get('product')
+                ->select('product_regis.bill_number, product.service_cycle_value, product.service_cycle_unit, product_category.name AS category_name, product_subcategory.subcategory_name AS subcategory_name')
+                ->join('product', 'product.id = product_regis.product_id', 'inner')
+                ->join('product_category', 'product_category.id = product.category', 'left')
+                ->join('product_subcategory', 'product_subcategory.id = product.sub_category_id', 'left')
+                ->where('product_regis.product_id IS NOT NULL', null, false)
+                ->get('product_regis')
                 ->result_array();
+            $tgDebug['connected'] = true;
+            $tgDebug['rows_fetched'] = count($cyc_rows);
             foreach ($cyc_rows as $cr) {
-                $serviceCycleByRegisName[trim($cr['regis_name'])] = [
-                    'value' => (int) $cr['service_cycle_value'],
-                    'unit'  => $cr['service_cycle_unit'],
-                ];
+                $bn = trim($cr['bill_number']);
+                if ($bn === '') { continue; }
+                if ($cr['service_cycle_value'] !== null && $cr['service_cycle_unit'] !== null) {
+                    $serviceCycleByBillNumber[$bn] = [
+                        'value' => (int) $cr['service_cycle_value'],
+                        'unit'  => $cr['service_cycle_unit'],
+                    ];
+                }
+                if (!empty($cr['category_name']) || !empty($cr['subcategory_name'])) {
+                    $categoryByBillNumber[$bn] = [
+                        'main' => $cr['category_name'] ?: null,
+                        'sub'  => $cr['subcategory_name'] ?: null,
+                    ];
+                }
             }
         } catch (Exception $e) {
+            $tgDebug['error'] = $e->getMessage();
             // เชื่อมฐาน tgsmartlife ไม่ได้ (เช่น ตั้งค่า credential ผิดตอน local) — ใช้รอบ 6 เดือนเดิมทุกแถวแทน
             $serviceCycleByRegisName = [];
+            $categoryByRegisName = [];
         }
 
         // ── ดึง "วันที่เปลี่ยนไส้กรองล่าสุด" ต่อลูกค้า (customer_name) ──
@@ -319,12 +337,24 @@ class CustomerMap extends CI_Controller {
 
             // ── คำนวณครบกำหนด ──────────────────────────────────────
             // ค่าเริ่มต้นคือรอบเดิม (6 เดือนนับจาก last_service_date) เหมือนที่เคยมีมาตลอด
-            // ถ้า product_service ของงานนี้จับคู่กับสินค้าที่ตั้งรอบบริการไว้ฝั่ง tgsmartlife ได้
-            // (ตรงเป๊ะกับ regis_name) ใช้รอบของสินค้านั้นแทน — ไม่เจอก็ยังใช้ 6 เดือนเดิมเป๊ะๆ
+            // จับคู่ผ่านเลขบิล (ตัดส่วนต่อท้าย _1,_2 ฯลฯ ออกก่อน เพราะฝั่ง service_jobs มักมีต่อท้าย
+            // แต่ product_regis.bill_number ฝั่ง tgsmartlife ไม่มี) กับ product_regis ที่มี product_id
+            // ผูกไว้แล้วเท่านั้น — ไม่เจอ/ไม่มี product_id ยังใช้รอบ 6 เดือนเดิมเป๊ะๆ ไม่กรองออก
             $intervalStr = '+6 months';
-            $productServiceName = trim((string) ($r['product_service'] ?? ''));
-            if ($productServiceName !== '' && isset($serviceCycleByRegisName[$productServiceName])) {
-                $cyc      = $serviceCycleByRegisName[$productServiceName];
+            $billNoBase = preg_replace('/_\d+$/', '', trim((string) ($r['bill_no'] ?? '')));
+            $productCat = $categoryByBillNumber[$billNoBase] ?? null;
+            $productCategoryMain = $productCat['main'] ?? null;
+            $productCategorySub  = $productCat['sub']  ?? null;
+            if (count($debugSample) < 10) {
+                $debugSample[] = [
+                    'bill_no'      => $r['bill_no'] ?? null,
+                    'bill_no_base' => $billNoBase,
+                    'matched_main' => $productCategoryMain,
+                    'matched_sub'  => $productCategorySub,
+                ];
+            }
+            if ($billNoBase !== '' && isset($serviceCycleByBillNumber[$billNoBase])) {
+                $cyc      = $serviceCycleByBillNumber[$billNoBase];
                 $unitWord = ($cyc['unit'] === 'year') ? 'years' : 'months';
                 if ($cyc['value'] > 0) {
                     $intervalStr = '+' . $cyc['value'] . ' ' . $unitWord;
@@ -383,19 +413,6 @@ class CustomerMap extends CI_Controller {
                 $label         = 'เกินกำหนด (เลยกำหนด ' . abs($days_to_due) . ' วัน)';
             }
 
-            $counts['all']++;
-            $counts[$marker_status]++;
-            if ($r['status'] === 'รอดำเนินการ') {
-                $counts['pending']++;
-            }
-
-            // กรองตาม filter สี (filter=pending คือกรองตามสถานะงานจริง แยกจากสีวันครบกำหนด)
-            if ($filter === 'pending') {
-                if ($r['status'] !== 'รอดำเนินการ') continue;
-            } elseif ($filter !== 'all' && $marker_status !== $filter) {
-                continue;
-            }
-
             // กรองตาม job_type
             if (!empty($job_type) && $job_type !== 'all') {
                 $service_types = ['ติดตั้ง', 'เปลี่ยนไส้กรอง'];
@@ -410,6 +427,29 @@ class CustomerMap extends CI_Controller {
                         continue;
                     }
                 }
+            }
+
+            // กรองตามหมวดหมู่สินค้า (จาก tgsmartlife ผ่านการจับคู่ bill_no ด้านบน) — เทียบได้ทั้งหมวดหมู่หลักและย่อย
+            if (!empty($category) && $category !== 'all') {
+                if ($productCategoryMain !== $category && $productCategorySub !== $category) {
+                    continue;
+                }
+            }
+
+            // นับสถิติหลังกรอง job_type/category แล้ว (ให้แถบสถิติสะท้อนตัวกรองที่เลือกอยู่จริง
+            // ตามที่ระบุ) — แต่ยังนับก่อนเช็ค filter สี/สถานะเอง เพราะแถบสถิติคือตัวแบ่งตามสีนั้น
+            // อยู่แล้ว ต้องนับครบทุกสีพร้อมกันไว้ ไม่งั้นกดปุ่มสีไหนจะเหลือแต่ปุ่มนั้นตัวเดียวไม่เป็น 0
+            $counts['all']++;
+            $counts[$marker_status]++;
+            if ($r['status'] === 'รอดำเนินการ') {
+                $counts['pending']++;
+            }
+
+            // กรองตาม filter สี (filter=pending คือกรองตามสถานะงานจริง แยกจากสีวันครบกำหนด)
+            if ($filter === 'pending') {
+                if ($r['status'] !== 'รอดำเนินการ') continue;
+            } elseif ($filter !== 'all' && $marker_status !== $filter) {
+                continue;
             }
 
             // ส่งวันครบกำหนดถัดไปเป็น due_1y (ใช้ชื่อเดิมเพื่อไม่ต้องแก้ JS)
@@ -428,6 +468,8 @@ class CustomerMap extends CI_Controller {
                 'install_date'     => $r['install_date'],
                 'last_service_date'=> $r['last_service_date'],
                 'product_service'  => $r['product_service'],
+                'product_category'     => $productCategoryMain,
+                'product_subcategory'  => $productCategorySub,
                 'job_type'         => $r['job_type'],
                 'technician'       => $r['technician'],
                 'status'           => $r['status'],
@@ -443,11 +485,24 @@ class CustomerMap extends CI_Controller {
             ];
         }
 
-        echo json_encode([
+        $response = [
             'success' => true,
             'data'    => $markers,
             'counts'  => $counts,
-        ], JSON_UNESCAPED_UNICODE);
+        ];
+        // ── ชั่วคราว เพื่อวินิจฉัยปัญหาตัวกรองหมวดหมู่ — ลบออกได้เมื่อยืนยันสาเหตุแล้ว ──
+        // เรียกด้วย &debug=1 ต่อท้าย URL api_markers เพื่อดูว่า: เชื่อมฐาน tgsmartlife ได้จริงไหม,
+        // ดึงมากี่แถว, ค่า category ที่ server ได้รับจริงคืออะไร, ตัวอย่างการจับคู่ 10 แถวแรก
+        if ($this->input->get('debug', TRUE) === '1') {
+            $response['_debug'] = [
+                'tgsmartlife_connected'   => $tgDebug['connected'],
+                'tgsmartlife_error'       => $tgDebug['error'],
+                'tgsmartlife_rows_fetched'=> $tgDebug['rows_fetched'],
+                'category_received'      => $category,
+                'sample_matches'         => $debugSample,
+            ];
+        }
+        echo json_encode($response, JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             echo json_encode(['success'=>false,'message'=>$e->getMessage()], JSON_UNESCAPED_UNICODE);
         }
@@ -558,6 +613,58 @@ class CustomerMap extends CI_Controller {
         $types = array_values(array_unique(array_column($rows, 'last_type')));
         sort($types);
         echo json_encode(['success'=>true,'data'=>$types], JSON_UNESCAPED_UNICODE);
+    }
+
+    // API: หมวดหมู่สินค้า สำหรับ filter dropdown — เฉพาะหมวดหมู่ที่มีงานบริการจริงอยู่ในระบบ
+    // (จับคู่ product_service ที่ใช้จริงกับ tgsmartlife.product.regis_name เหมือน api_markers())
+    public function api_categories() {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$this->_employee_allowed()) { $this->_forbidden_json(); return; }
+
+        $rows = $this->db
+            ->distinct()
+            ->select('bill_no')
+            ->where('bill_no IS NOT NULL', null, false)
+            ->where('bill_no !=', '')
+            ->get('service_jobs')
+            ->result_array();
+        // ตัดส่วนต่อท้าย _1,_2 ฯลฯ ออกก่อนเทียบ เหมือนกับใน api_markers()
+        $usedBillNumbers = [];
+        foreach ($rows as $r) {
+            $usedBillNumbers[preg_replace('/_\d+$/', '', trim($r['bill_no']))] = true;
+        }
+
+        $mainCategories = [];
+        $subCategories  = [];
+        try {
+            $tg_db = $this->load->database('tgsmartlife', TRUE);
+            $cat_rows = $tg_db
+                ->select('product_regis.bill_number, product_category.name AS category_name, product_subcategory.subcategory_name AS subcategory_name')
+                ->join('product', 'product.id = product_regis.product_id', 'inner')
+                ->join('product_category', 'product_category.id = product.category', 'left')
+                ->join('product_subcategory', 'product_subcategory.id = product.sub_category_id', 'left')
+                ->where('product_regis.product_id IS NOT NULL', null, false)
+                ->get('product_regis')
+                ->result_array();
+            $mainByBillNumber = [];
+            $subByBillNumber  = [];
+            foreach ($cat_rows as $cr) {
+                $bn = trim($cr['bill_number']);
+                if (!empty($cr['category_name']))    { $mainByBillNumber[$bn] = $cr['category_name']; }
+                if (!empty($cr['subcategory_name']))  { $subByBillNumber[$bn]  = $cr['subcategory_name']; }
+            }
+            foreach (array_keys($usedBillNumbers) as $bn) {
+                if (isset($mainByBillNumber[$bn])) { $mainCategories[$mainByBillNumber[$bn]] = true; }
+                if (isset($subByBillNumber[$bn]))  { $subCategories[$subByBillNumber[$bn]]   = true; }
+            }
+        } catch (Exception $e) {
+            $mainCategories = [];
+            $subCategories  = [];
+        }
+
+        $mainList = array_keys($mainCategories); sort($mainList);
+        $subList  = array_keys($subCategories);  sort($subList);
+        echo json_encode(['success'=>true,'data'=>['main'=>$mainList,'sub'=>$subList]], JSON_UNESCAPED_UNICODE);
     }
 
     // API: technician list สำหรับ filter dropdown

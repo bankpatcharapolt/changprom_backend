@@ -89,13 +89,14 @@
 #search-box { -webkit-box-flex: 1; -ms-flex: 1; flex: 1; min-width: 0; margin-right: 8px; }
 #tech-filter { width: 140px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
 #jobtype-filter { width: 180px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
+#category-filter { width: 160px; -ms-flex-negative: 0; flex-shrink: 0; margin-right: 8px; }
 
 /* Mobile: ค้นหาบรรทัดแรกเต็มความกว้าง, ช่าง+ประเภทงานแบ่งครึ่งบรรทัดสอง
    (เดิมซ่อน #tech-filter ทิ้งบนมือถือ ทำให้กรองช่างไม่ได้เลย — แก้ด้วยการ wrap แทนการซ่อน) */
 @media (max-width: 640px) {
   #map-toolbar { -ms-flex-wrap: wrap; flex-wrap: wrap; }
   #search-box { -webkit-box-flex: 1; -ms-flex: 1 1 100%; flex: 1 1 100%; margin-right: 0; margin-bottom: 8px; }
-  #tech-filter, #jobtype-filter {
+  #tech-filter, #jobtype-filter, #category-filter {
     display: block;
     width: auto;
     -webkit-box-flex: 1; -ms-flex: 1 1 0; flex: 1 1 0;
@@ -440,6 +441,9 @@
     <select id="jobtype-filter" class="form-select form-select-sm">
       <option value="">-- ประเภทงาน --</option>
     </select>
+    <select id="category-filter" class="form-select form-select-sm">
+      <option value="">-- หมวดหมู่ทั้งหมด --</option>
+    </select>
     <button class="btn btn-sm btn-outline-secondary" style="-ms-flex-negative:0;flex-shrink:0;" id="btn-refresh">
       <i class="bi bi-arrow-clockwise"></i>
     </button>
@@ -513,6 +517,7 @@ var API_MARKERS = '<?= site_url("customer_map/api_markers") ?>';
 var API_TECHS     = '<?= site_url("customer_map/api_techs") ?>';
 var API_HISTORY   = '<?= site_url("customer_map/api_history") ?>';
 var API_JOB_TYPES   = '<?= site_url("customer_map/api_job_types") ?>';
+var API_CATEGORIES  = '<?= site_url("customer_map/api_categories") ?>';
 var CHANGPROM_URL   = '<?= "https://changprom.tgsmartlife.com" . "/queue/detail/" ?>';
 var SERVICE_URL = '<?= site_url("service") ?>';
  var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
@@ -589,6 +594,7 @@ function initMap() {
   });
   loadTechs();
   loadJobTypes();
+  loadCategories();
   loadMarkers();
 
   // auto-show ตำแหน่ง user หลัง map init เสร็จ
@@ -628,14 +634,40 @@ function loadJobTypes() {
     });
   });
 }
+function loadCategories() {
+  fetch(API_CATEGORIES).then(function(r){ return r.json(); }).then(function(res) {
+    if (!res.success) return;
+    var sel = document.getElementById('category-filter');
+    if (res.data.main && res.data.main.length) {
+      var gMain = document.createElement('optgroup');
+      gMain.label = 'หมวดหมู่หลัก';
+      res.data.main.forEach(function(c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c; gMain.appendChild(o);
+      });
+      sel.appendChild(gMain);
+    }
+    if (res.data.sub && res.data.sub.length) {
+      var gSub = document.createElement('optgroup');
+      gSub.label = 'หมวดหมู่ย่อย';
+      res.data.sub.forEach(function(c) {
+        var o = document.createElement('option');
+        o.value = c; o.textContent = c; gSub.appendChild(o);
+      });
+      sel.appendChild(gSub);
+    }
+  });
+}
 function loadMarkers() {
   var q    = document.getElementById('search-box').value.trim();
   var tech = document.getElementById('tech-filter').value;
   var jobType = document.getElementById('jobtype-filter').value;
+  var category = document.getElementById('category-filter').value;
   var url  = API_MARKERS + '?filter=' + currentFilter
            + '&q=' + encodeURIComponent(q)
            + '&tech=' + encodeURIComponent(tech)
-           + '&job_type=' + encodeURIComponent(jobType);
+           + '&job_type=' + encodeURIComponent(jobType)
+           + '&category=' + encodeURIComponent(category);
 
   markers.forEach(function(m){ m.setMap(null); });
   markers = [];
@@ -727,6 +759,10 @@ document.getElementById('search-box').addEventListener('input', function() {
 });
 document.getElementById('tech-filter').addEventListener('change', loadMarkers);
 document.getElementById('jobtype-filter').addEventListener('change', function() {
+  loadMarkers();
+  goToLocation(10);
+});
+document.getElementById('category-filter').addEventListener('change', function() {
   loadMarkers();
   goToLocation(10);
 });

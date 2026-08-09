@@ -44,6 +44,8 @@ $route['customer_map/api_history']        = 'CustomerMap/api_history';
 $route['map/api_history']                 = 'CustomerMap/api_history';
 $route['customer_map/api_job_types']      = 'CustomerMap/api_job_types';
 $route['map/api_job_types']              = 'CustomerMap/api_job_types';
+$route['customer_map/api_categories']     = 'CustomerMap/api_categories';
+$route['map/api_categories']             = 'CustomerMap/api_categories';
 
 // ── Public map (ไม่ต้อง login) ─────────────────────────────
 $route['map']                             = 'CustomerMap/public_index';
