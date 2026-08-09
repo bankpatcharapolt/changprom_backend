@@ -108,6 +108,33 @@ class CustomerMap extends CI_Controller {
         $job_type = $this->token_bill_no ? '' : trim($this->input->get('job_type',  TRUE) ?? '');
         $today    = date('Y-m-d');
 
+        // ── รอบระยะเวลาบริการต่อสินค้า (จาก tgsmartlife.product) ──────────
+        // จับคู่ product_service (ชื่อสินค้าที่กรอกไว้ในงานบริการ) กับ product.regis_name
+        // ฝั่ง tgsmartlife แบบตรงเป๊ะ (เหมือนตอน import product_regis) ถ้าเจอและตั้งค่า
+        // service_cycle_value/unit ไว้ ใช้รอบนั้นแทน 6 เดือนที่เคย hardcode ไว้ ถ้าไม่เจอ
+        // (สินค้าไม่ตรง หรือยังไม่ได้ตั้งค่า) ใช้รอบ 6 เดือนเดิมเหมือนที่เคยมีมาตลอด
+        $serviceCycleByRegisName = [];
+        try {
+            $tg_db = $this->load->database('tgsmartlife', TRUE);
+            $cyc_rows = $tg_db
+                ->select('regis_name, service_cycle_value, service_cycle_unit')
+                ->where('regis_name IS NOT NULL', null, false)
+                ->where('regis_name !=', '')
+                ->where('service_cycle_value IS NOT NULL', null, false)
+                ->where('service_cycle_unit IS NOT NULL', null, false)
+                ->get('product')
+                ->result_array();
+            foreach ($cyc_rows as $cr) {
+                $serviceCycleByRegisName[trim($cr['regis_name'])] = [
+                    'value' => (int) $cr['service_cycle_value'],
+                    'unit'  => $cr['service_cycle_unit'],
+                ];
+            }
+        } catch (Exception $e) {
+            // เชื่อมฐาน tgsmartlife ไม่ได้ (เช่น ตั้งค่า credential ผิดตอน local) — ใช้รอบ 6 เดือนเดิมทุกแถวแทน
+            $serviceCycleByRegisName = [];
+        }
+
         // ── ดึง "วันที่เปลี่ยนไส้กรองล่าสุด" ต่อลูกค้า (customer_name) ──
         // ถ้ามี job_type='เปลี่ยนไส้กรอง' ใช้ start_time ล่าสุดของ row นั้น
         // ถ้าไม่มี ใช้ start_time ล่าสุดของงาน job_type='ติดตั้ง'
@@ -291,7 +318,19 @@ class CustomerMap extends CI_Controller {
             }
 
             // ── คำนวณครบกำหนด ──────────────────────────────────────
-            // กำหนดเปลี่ยนไส้กรองทุก 6 เดือน นับจาก last_service_date เสมอ
+            // ค่าเริ่มต้นคือรอบเดิม (6 เดือนนับจาก last_service_date) เหมือนที่เคยมีมาตลอด
+            // ถ้า product_service ของงานนี้จับคู่กับสินค้าที่ตั้งรอบบริการไว้ฝั่ง tgsmartlife ได้
+            // (ตรงเป๊ะกับ regis_name) ใช้รอบของสินค้านั้นแทน — ไม่เจอก็ยังใช้ 6 เดือนเดิมเป๊ะๆ
+            $intervalStr = '+6 months';
+            $productServiceName = trim((string) ($r['product_service'] ?? ''));
+            if ($productServiceName !== '' && isset($serviceCycleByRegisName[$productServiceName])) {
+                $cyc      = $serviceCycleByRegisName[$productServiceName];
+                $unitWord = ($cyc['unit'] === 'year') ? 'years' : 'months';
+                if ($cyc['value'] > 0) {
+                    $intervalStr = '+' . $cyc['value'] . ' ' . $unitWord;
+                }
+            }
+
             $base    = $r['last_service_date'] ?? $r['install_date'];
             $ts_now  = strtotime($today);
             $due_next = null;  // วันครบกำหนดถัดไป (Y-m-d)
@@ -300,8 +339,8 @@ class CustomerMap extends CI_Controller {
             if ($base) {
                 $ts_base = strtotime($base);
 
-                // หา "รอบแรกที่ครบกำหนด" (6 เดือนแรกหลัง last_service)
-                $ts_first_due = strtotime(date('Y-m-d', $ts_base) . ' +6 months');
+                // หา "รอบแรกที่ครบกำหนด" (รอบแรกหลัง last_service ตามรอบของสินค้านั้น หรือ 6 เดือน ถ้าไม่เจอ)
+                $ts_first_due = strtotime(date('Y-m-d', $ts_base) . ' ' . $intervalStr);
 
                 if ($ts_now < $ts_first_due) {
                     // ยังไม่ถึงรอบแรก → หาวันครบกำหนดถัดไป = $ts_first_due
@@ -315,7 +354,7 @@ class CustomerMap extends CI_Controller {
                     $ts_last_missed = $ts_first_due;
                     while ($ts_due <= $ts_now) {
                         $ts_last_missed = $ts_due;
-                        $ts_due = strtotime(date('Y-m-d', $ts_due) . ' +6 months');
+                        $ts_due = strtotime(date('Y-m-d', $ts_due) . ' ' . $intervalStr);
                     }
                     $due_next     = date('Y-m-d', $ts_last_missed); // รอบที่เลยมาล่าสุด
                     $overdue_days = (int)floor(($ts_now - $ts_last_missed) / 86400);

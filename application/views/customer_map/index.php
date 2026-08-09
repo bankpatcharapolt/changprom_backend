@@ -513,9 +513,7 @@ var API_MARKERS = '<?= site_url("customer_map/api_markers") ?>';
 var API_TECHS     = '<?= site_url("customer_map/api_techs") ?>';
 var API_HISTORY   = '<?= site_url("customer_map/api_history") ?>';
 var API_JOB_TYPES   = '<?= site_url("customer_map/api_job_types") ?>';
-//var CHANGPROM_URL   = '<?= rtrim(str_replace("service_management", "", base_url()), "/") . "/changprom/queue/detail/" ?>';
 var CHANGPROM_URL   = '<?= "https://changprom.tgsmartlife.com" . "/queue/detail/" ?>';
-
 var SERVICE_URL = '<?= site_url("service") ?>';
  var GMAPS_KEY   = '<?= htmlspecialchars($gmaps_key ?? '', ENT_QUOTES) ?>';
 //var GMAPS_KEY   = 'AIzaSyBiDeosZazrjT1PMnhs7TuKOpjJFDoGUJg';// prod
