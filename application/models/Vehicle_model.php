@@ -7,7 +7,7 @@ class Vehicle_model extends CI_Model {
 
     public function get_all() {
         return $this->db
-            ->select('id, vehicle_type, license_plate, province, brand, model, color, note, active, created, updated')
+            ->select('id, vehicle_type, license_plate, province, brand, model, color, map_link, note, active, created, updated')
             ->from($this->table)
             ->order_by('active', 'DESC')
             ->order_by('vehicle_type', 'ASC')
@@ -40,7 +40,7 @@ class Vehicle_model extends CI_Model {
     }
 
     private function _clean($data, $is_new = false) {
-        $allowed = ['vehicle_type','license_plate','province','brand','model','color','note','active'];
+        $allowed = ['vehicle_type','license_plate','province','brand','model','color','map_link','note','active'];
         $row = [];
         foreach ($allowed as $f) {
             if (array_key_exists($f, $data)) {

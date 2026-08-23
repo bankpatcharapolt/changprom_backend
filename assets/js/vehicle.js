@@ -2,6 +2,21 @@
 var vehicleTable = null;
 var deleteId     = null;
 
+// ── กัน HTML/attribute injection ตอนแสดง map_link ──────────────
+function escAttr(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function normalizeLinkHref(v) {
+  if (!v) return null;
+  var s = String(v).trim();
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s)) {
+    try { return new URL(s).href; } catch (e) { return null; }
+  }
+  try { return new URL('https://' + s).href; } catch (e) { return null; }
+}
+
 // ── type icon ──────────────────────────────────────────────────
 function typeIcon(type) {
   var icons = {
@@ -48,6 +63,7 @@ function resetForm() {
   $('#vf_brand').val('');
   $('#vf_model').val('');
   $('#vf_color').val('');
+  $('#vf_map_link').val('');
   $('#vf_note').val('');
   $('#vf_active').val('1');
   $('#vehicleModalTitle').html('<i class="bi bi-plus-circle me-2"></i>เพิ่มยานพาหนะ');
@@ -65,6 +81,7 @@ window.editVehicle = function(id) {
     $('#vf_brand').val(d.brand || '');
     $('#vf_model').val(d.model || '');
     $('#vf_color').val(d.color || '');
+    $('#vf_map_link').val(d.map_link || '');
     $('#vf_note').val(d.note || '');
     $('#vf_active').val(d.active != null ? d.active : 1);
     $('#vehicleModalTitle').html('<i class="bi bi-pencil-square me-2"></i>แก้ไขยานพาหนะ #' + d.id);
@@ -89,6 +106,7 @@ function saveVehicle() {
     brand:             $('#vf_brand').val().trim(),
     model:             $('#vf_model').val().trim(),
     color:             $('#vf_color').val().trim(),
+    map_link:          $('#vf_map_link').val().trim(),
     note:              $('#vf_note').val().trim(),
     active:            parseInt($('#vf_active').val()),
   };
@@ -134,6 +152,18 @@ $(function() {
         }
       },
       { data: 'color', defaultContent: '-' },
+      { data: 'map_link', render: function(v){
+          if (!v) return '-';
+          var safe = escAttr(v);
+          var body = '<span class="text-truncate d-inline-block align-middle" style="max-width:200px">' + safe + '</span>';
+          var href = normalizeLinkHref(v);
+          if (href) {
+            return '<a href="' + escAttr(href) + '" target="_blank" rel="noopener" class="text-decoration-none" title="' + safe + '">'
+                 + '<i class="bi bi-geo-alt-fill text-danger me-1"></i>' + body + '</a>';
+          }
+          return '<span title="' + safe + '">' + body + '</span>';
+        }
+      },
       { data: 'active', className: 'text-center', render: function(v){
           return v == 1
             ? '<span class="badge bg-success">ใช้งาน</span>'

@@ -73,6 +73,7 @@
             <th>จังหวัด</th>
             <th>ยี่ห้อ/รุ่น</th>
             <th>สี</th>
+            <th>ตำแหน่งรถ</th>
             <th class="text-center">สถานะ</th>
             <th class="text-center">จัดการ</th>
           </tr>
@@ -149,6 +150,13 @@
           <div class="col-md-6">
             <label class="form-label fw-medium">สี</label>
             <input type="text" id="vf_color" class="form-control" placeholder="เช่น ขาว, ดำ, แดง">
+          </div>
+
+          <!-- ลิ้งค์ตำแหน่งรถ -->
+          <div class="col-md-6">
+            <label class="form-label fw-medium">ลิ้งค์ตำแหน่งรถ</label>
+            <input type="url" id="vf_map_link" class="form-control"
+                   placeholder="เช่น https://maps.app.goo.gl/xxxxx" autocomplete="off">
           </div>
 
           <!-- หมายเหตุ -->
